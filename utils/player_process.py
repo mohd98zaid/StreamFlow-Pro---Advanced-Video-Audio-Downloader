@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import threading
 import ctypes
 import time
@@ -8,6 +9,12 @@ import logging
 from pathlib import Path
 import webview
 import yt_dlp
+
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except ImportError:
+    pass
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -61,10 +68,19 @@ class PlayerApi:
                 embed_meta = cfg.get("embed_metadata", True)
                 
                 ydl_opts = {
-                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                    'format': 'bestvideo+bestaudio/best',
+                    'merge_output_format': 'mp4',
                     'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
                     'quiet': True,
                     'no_warnings': True,
+                    'nocheckcertificate': True,
+                    'retries': 10,
+                    'fragment_retries': 10,
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['android', 'ios', 'web']
+                        }
+                    },
                     'writethumbnail': embed_thumb,
                 }
                 
@@ -105,14 +121,18 @@ class PlayerApi:
                 if active_window:
                     active_window.evaluate_js("if(window.onDownloadComplete) window.onDownloadComplete(true, 'Download Complete!');")
             except Exception as e:
-                logging.error(f"Player download failed: {e}")
+                raw_err = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', str(e))
+                clean_err = re.sub(r'^(?:ERROR:\s*)+', '', raw_err).strip()
+                logging.error(f"Player download failed: {clean_err}")
+                clean_err_escaped = clean_err.replace("'", "\\'").replace('"', '\\"')
                 if active_window:
-                    active_window.evaluate_js(f"if(window.onDownloadComplete) window.onDownloadComplete(false, '{str(e)[:40]}');")
+                    active_window.evaluate_js(f"if(window.onDownloadComplete) window.onDownloadComplete(false, '{clean_err_escaped[:35]}');")
             finally:
                 is_downloading = False
 
         threading.Thread(target=run_download, daemon=True).start()
         return {"status": "started", "message": "Download started in background"}
+
 
 def start_esc_listener():
     """Background listener for physical ESC key to restore window even when focus is inside video player"""

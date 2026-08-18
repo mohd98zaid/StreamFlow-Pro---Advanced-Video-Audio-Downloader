@@ -69,10 +69,18 @@ class Downloader:
             'progress_hooks': [lambda d: self.update_progress(d, item)],
             'postprocessor_hooks': [lambda d: self.postprocess_hook(d, item)],
             'quiet': True,
-            'no_warnings': False,
+            'no_warnings': True,
             'ignoreerrors': True,
-            'retries': 3,
+            'nocheckcertificate': True,
+            'retries': 10,
+            'fragment_retries': 10,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios', 'web']
+                }
+            },
         }
+
         
         # Rate limiting
         if item.options.get('limit_rate') and item.options.get('rate_limit'):
