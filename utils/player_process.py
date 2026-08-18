@@ -1,10 +1,23 @@
 import sys
+import os
 import threading
 import ctypes
 import time
+import json
+import logging
+from pathlib import Path
 import webview
+import yt_dlp
+
+# Add project root to sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.config import ConfigManager
+from core.database import DatabaseManager
+from core.models import DownloadItem, DownloadStatus
 
 active_window = None
+current_download_lock = threading.Lock()
+is_downloading = False
 
 class PlayerApi:
     """JS API without self-references to avoid .NET introspection recursion"""
@@ -25,6 +38,81 @@ class PlayerApi:
     def is_fullscreen(self):
         global active_window
         return bool(active_window and active_window.fullscreen)
+
+    def download_current_video(self, url_or_id):
+        """Download currently playing video in background using user settings"""
+        global is_downloading
+        if is_downloading:
+            return {"status": "busy", "message": "Download already in progress"}
+        
+        target_url = url_or_id
+        if not target_url.startswith("http"):
+            target_url = f"https://www.youtube.com/watch?v={url_or_id}"
+            
+        def run_download():
+            global is_downloading
+            is_downloading = True
+            try:
+                cfg = ConfigManager().config
+                download_path = cfg.get("download_path", str(Path.home() / "Downloads"))
+                Path(download_path).mkdir(parents=True, exist_ok=True)
+                
+                embed_thumb = cfg.get("embed_thumbnail", True)
+                embed_meta = cfg.get("embed_metadata", True)
+                
+                ydl_opts = {
+                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                    'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
+                    'quiet': True,
+                    'no_warnings': True,
+                    'writethumbnail': embed_thumb,
+                }
+                
+                postprocessors = []
+                if embed_thumb:
+                    postprocessors.append({'key': 'EmbedThumbnail'})
+                if embed_meta:
+                    postprocessors.append({'key': 'FFmpegMetadata'})
+                if postprocessors:
+                    ydl_opts['postprocessors'] = postprocessors
+
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(target_url, download=True)
+                    title = info.get('title', 'Video')
+                    channel = info.get('uploader') or info.get('channel') or ''
+                    duration = str(info.get('duration', ''))
+                    
+                    # Record in SQLite history
+                    try:
+                        db = DatabaseManager()
+                        item = DownloadItem(
+                            url=target_url,
+                            title=title,
+                            download_type="video",
+                            quality="Best (Auto)",
+                            status=DownloadStatus.COMPLETED,
+                            progress=100.0,
+                            file_path=os.path.join(download_path, f"{title}.mp4"),
+                            completed_at=time.strftime('%Y-%m-%d %H:%M:%S'),
+                            channel=channel,
+                            duration=duration
+                        )
+                        db.add_download(item)
+                    except Exception as db_err:
+                        logging.warning(f"History DB update error: {db_err}")
+                
+                # Notify frontend of completion
+                if active_window:
+                    active_window.evaluate_js("if(window.onDownloadComplete) window.onDownloadComplete(true, 'Download Complete!');")
+            except Exception as e:
+                logging.error(f"Player download failed: {e}")
+                if active_window:
+                    active_window.evaluate_js(f"if(window.onDownloadComplete) window.onDownloadComplete(false, '{str(e)[:40]}');")
+            finally:
+                is_downloading = False
+
+        threading.Thread(target=run_download, daemon=True).start()
+        return {"status": "started", "message": "Download started in background"}
 
 def start_esc_listener():
     """Background listener for physical ESC key to restore window even when focus is inside video player"""
@@ -131,12 +219,15 @@ CONTROLS_CSS = """
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
     cursor: pointer;
     backdrop-filter: blur(12px);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
     transition: all 0.2s ease;
     user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .ag-control-btn:hover {
@@ -148,6 +239,18 @@ CONTROLS_CSS = """
 
 .ag-control-btn:active {
     transform: scale(0.98);
+}
+
+.ag-download-btn {
+    background: rgba(16, 185, 129, 0.92) !important;
+    border-color: rgba(52, 211, 153, 0.5) !important;
+    color: #FFFFFF !important;
+}
+
+.ag-download-btn:hover {
+    background: #059669 !important;
+    border-color: #10B981 !important;
+    transform: scale(1.05);
 }
 """
 
@@ -176,31 +279,41 @@ CINEMA_JS = """
             controls = document.createElement('div');
             controls.id = 'antigravity-top-controls';
             
-            // Maximize Screen Button
+            // 1. Maximize Screen Button
             const fsBtn = document.createElement('button');
             fsBtn.className = 'ag-control-btn';
             fsBtn.id = 'agFsBtn';
             fsBtn.textContent = '⛶ Maximize Screen';
 
-            // Switch to YouTube Web View Button
+            // 2. Switch to YouTube Web View Button
             const modeBtn = document.createElement('button');
             modeBtn.className = 'ag-control-btn';
             modeBtn.id = 'agModeBtn';
             modeBtn.textContent = '🌐 YouTube View';
             modeBtn.title = 'Switch between Cinema Mode and YouTube Web Interface';
             
+            // 3. Download Current Video Button
+            const dlBtn = document.createElement('button');
+            dlBtn.className = 'ag-control-btn ag-download-btn';
+            dlBtn.id = 'agDlBtn';
+            dlBtn.textContent = '⬇️ Download Video';
+            dlBtn.title = 'Download current video directly to your Downloads folder';
+
             controls.appendChild(fsBtn);
             controls.appendChild(modeBtn);
+            controls.appendChild(dlBtn);
             document.body.appendChild(controls);
         }
 
         let isFull = false;
         let isCinema = true;
         let isHovered = false;
+        let isDownloading = false;
         let hideTimer;
         
         const fsBtn = document.getElementById('agFsBtn');
         const modeBtn = document.getElementById('agModeBtn');
+        const dlBtn = document.getElementById('agDlBtn');
 
         function updateFullscreenState(state) {
             isFull = state;
@@ -235,6 +348,39 @@ CINEMA_JS = """
                 }
             });
         }
+
+        if (dlBtn) {
+            dlBtn.addEventListener('click', () => {
+                if (isDownloading) return;
+                const currentUrl = window.location.href;
+                isDownloading = true;
+                dlBtn.textContent = '⏳ Downloading...';
+                dlBtn.style.background = 'rgba(234, 88, 12, 0.92)';
+                
+                if (window.pywebview && window.pywebview.api) {
+                    window.pywebview.api.download_current_video(currentUrl);
+                }
+            });
+        }
+
+        window.onDownloadComplete = function(success, msg) {
+            isDownloading = false;
+            if (dlBtn) {
+                if (success) {
+                    dlBtn.textContent = '✅ Saved to Downloads!';
+                    dlBtn.style.background = 'rgba(16, 185, 129, 0.92)';
+                } else {
+                    dlBtn.textContent = '⚠️ ' + msg;
+                    dlBtn.style.background = 'rgba(220, 38, 38, 0.92)';
+                }
+                setTimeout(() => {
+                    if (dlBtn && !isDownloading) {
+                        dlBtn.textContent = '⬇️ Download Video';
+                        dlBtn.style.background = 'rgba(16, 185, 129, 0.92)';
+                    }
+                }, 4000);
+            }
+        };
 
         // 2-Second Inactivity Auto-Fade
         controls.addEventListener('mouseenter', () => {
@@ -294,7 +440,7 @@ CINEMA_JS = """
 """
 
 def on_loaded(window):
-    """Inject cinema styling, view switcher, and ad-stripper once YouTube page finishes loading"""
+    """Inject cinema styling, view switcher, download button, and ad-stripper once YouTube page finishes loading"""
     cinema_css_sanitized = CINEMA_CSS.replace("`", "\\`").replace("\n", " ")
     controls_css_sanitized = CONTROLS_CSS.replace("`", "\\`").replace("\n", " ")
     js_payload = CINEMA_JS.replace("{cinema_css}", cinema_css_sanitized).replace("{controls_css}", controls_css_sanitized)
@@ -318,7 +464,7 @@ def main():
     api = PlayerApi()
     
     window = webview.create_window(
-        title=f"🎬 Ad-Free Player: {title[:50]}",
+        title=f"🎬 StreamFlow Pro: {title[:50]}",
         url=watch_url,
         width=1040,
         height=650,
@@ -329,7 +475,7 @@ def main():
     )
     active_window = window
     
-    # Bind page load to inject cinema UI and ad-stripper
+    # Bind page load to inject cinema UI, view switcher, and download button
     window.events.loaded += lambda: on_loaded(window)
     
     try:
