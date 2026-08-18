@@ -1,6 +1,7 @@
-# 🎬 Advanced Video & Audio Downloader (Python + CustomTkinter)
+# 🎬 StreamFlow Pro — Advanced Video & Audio Downloader
 
-A powerful, high-performance, and feature-rich desktop YouTube & media downloader built with Python, `yt-dlp`, `CustomTkinter`, and Microsoft Edge WebView2.
+**StreamFlow Pro** is a high-performance, feature-rich desktop YouTube & media downloader built with Python, `yt-dlp`, `CustomTkinter`, and Microsoft Edge WebView2.
+
 
 ---
 
