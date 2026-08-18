@@ -44,9 +44,10 @@
 
 1. **Clone the repository**:
    ```bash
-   git clone <YOUR_REPO_URL>
-   cd VideoDownloaderPython
+   git clone https://github.com/mohd98zaid/StreamFlow-Pro---Advanced-Video-Audio-Downloader.git
+   cd StreamFlow-Pro---Advanced-Video-Audio-Downloader
    ```
+
 
 2. **Install required dependencies**:
    ```bash
@@ -91,9 +92,10 @@ win10toast>=0.9
 ## 📂 Project Architecture
 
 ```
-VideoDownloaderPython/
+StreamFlow-Pro/
 │
 ├── core/
+
 │   ├── config.py             # User preferences & configuration persistence
 │   ├── database.py           # SQLite download history database manager
 │   ├── downloader.py         # yt-dlp download worker & thread orchestration
