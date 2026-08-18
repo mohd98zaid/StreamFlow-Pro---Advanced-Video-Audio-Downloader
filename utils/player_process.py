@@ -475,8 +475,12 @@ def main():
     video_id = sys.argv[1]
     title = sys.argv[2] if len(sys.argv) > 2 else "Ad-Free Video Preview"
     
-    # Official YouTube watch URL (100% playable, zero embed-restrictions for all songs/music videos)
-    watch_url = f"https://www.youtube.com/watch?v={video_id}"
+    # Support direct internet URLs from any website (Instagram, Twitter/X, TikTok, Vimeo, etc.)
+    if video_id.startswith("http://") or video_id.startswith("https://"):
+        watch_url = video_id
+    else:
+        watch_url = f"https://www.youtube.com/watch?v={video_id}"
+
     
     # Start physical ESC key listener
     start_esc_listener()

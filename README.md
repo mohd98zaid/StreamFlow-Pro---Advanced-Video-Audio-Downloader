@@ -8,7 +8,9 @@
 ## ✨ Key Highlights
 
 ### ⚡ Core & Download Capabilities
+- **Universal Multi-Site Video Downloader**: Download videos and music from any website across the internet — **Instagram (Reels/Posts), TikTok, Twitter/X, Facebook, Reddit, Pinterest, Vimeo, Dailymotion, Twitch, SoundCloud, Bilibili, and direct MP4/M3U8 links**.
 - **Multi-Threaded Concurrent Downloads**: Download 3–5 videos simultaneously with maximum bandwidth utilization.
+
 - **Ultra-HD Video & Lossless Audio**: Support for 4K, 2K, 1080p, 720p, 480p down to 144p, plus audio extraction in MP3, M4A, WAV, and FLAC.
 - **YouTube In-App Search**: Search YouTube directly inside the app, inspect results, and download with a single click.
 - **Ad-Free In-App Video Preview Player**: Preview any video or song before downloading with zero ads in an ultra-clean Chromium WebView window.
