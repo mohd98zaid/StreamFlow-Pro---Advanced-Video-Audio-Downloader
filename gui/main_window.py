@@ -190,19 +190,33 @@ class AdvancedDownloaderApp:
         )
         self.folder_btn.pack(side=tk.RIGHT, padx=6)
 
-        # Open YouTube Button
+        # Load YouTube 2017 icon
+        yt_icon_img = None
+        try:
+            from PIL import Image
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "youtube_icon.png")
+            if os.path.exists(icon_path):
+                pil_img = Image.open(icon_path)
+                yt_icon_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(22, 15))
+        except Exception as e:
+            logging.warning(f"Could not load YouTube icon: {e}")
+
+        # Open YouTube Button with 2017 Brand Logo
         self.youtube_btn = ctk.CTkButton(
             header_actions,
-            text="▶️ Open YouTube",
-            width=135,
+            text=" YouTube",
+            image=yt_icon_img,
+            compound="left",
+            width=120,
             height=32,
-            fg_color=("#DC2626", "#EF4444"),
-            hover_color=("#B91C1C", "#DC2626"),
+            fg_color=("#FF0000", "#FF0000"),
+            hover_color=("#CC0000", "#CC0000"),
             text_color="#FFFFFF",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             command=self.open_youtube_browser
         )
         self.youtube_btn.pack(side=tk.RIGHT, padx=6)
+
 
 
         # Main Segmented TabView (CTkTabview) with high-contrast font styling
