@@ -249,7 +249,10 @@ class Downloader:
             return None
     
     def update_progress(self, d: Dict[str, Any], item: DownloadItem) -> None:
-        """Update download progress"""
+        """Update download progress and check for pause/cancel signals"""
+        if item.cancelled or item.paused:
+            raise yt_dlp.DownloadCancelled("Download stopped or paused by user")
+            
         try:
             if d['status'] == 'downloading':
                 if '_percent_str' in d:
@@ -279,7 +282,10 @@ class Downloader:
                     item.file_path = d['filename']
                 self.event_bus.emit(Event.DOWNLOAD_PROGRESS, item)
         except Exception as e:
-            logging.error(f"Progress update error: {e}")
+            if not isinstance(e, yt_dlp.DownloadCancelled):
+                logging.error(f"Progress update error: {e}")
+            else:
+                raise
     
     def postprocess_hook(self, d: Dict[str, Any], item: DownloadItem) -> None:
         """Post-processing hook"""
@@ -302,7 +308,7 @@ class Downloader:
     
     def download_item(self, item: DownloadItem) -> None:
         """Download a single item"""
-        if item.cancelled:
+        if item.cancelled or item.paused:
             return
         
         # Add to active downloads
@@ -320,6 +326,10 @@ class Downloader:
                 if item.cancelled:
                     self._handle_cancellation(item)
                     return
+                if item.paused:
+                    item.status = DownloadStatus.PAUSED.value
+                    self.event_bus.emit(Event.QUEUE_UPDATED, None)
+                    return
                 
                 try:
                     info = ydl.extract_info(item.url, download=False)
@@ -335,10 +345,14 @@ class Downloader:
                 if item.cancelled:
                     self._handle_cancellation(item)
                     return
+                if item.paused:
+                    item.status = DownloadStatus.PAUSED.value
+                    self.event_bus.emit(Event.QUEUE_UPDATED, None)
+                    return
                 
                 ydl.download([item.url])
             
-            if not item.cancelled:
+            if not item.cancelled and not item.paused:
                 item.status = DownloadStatus.COMPLETED.value
                 item.progress = 100
                 self.log(f"[OK] Completed: {item.title}")
@@ -346,6 +360,15 @@ class Downloader:
                 self.database.add_download(item)
                 self.event_bus.emit(Event.DOWNLOAD_COMPLETED, item)
         
+        except yt_dlp.DownloadCancelled:
+            if item.cancelled:
+                self._handle_cancellation(item)
+            elif item.paused:
+                item.status = DownloadStatus.PAUSED.value
+                item.speed = "Paused"
+                self.log(f"⏸️ Paused: {item.title}")
+                self.event_bus.emit(Event.DOWNLOAD_PROGRESS, item)
+                self.event_bus.emit(Event.QUEUE_UPDATED, None)
         except yt_dlp.DownloadError as e:
             self._handle_error(item, str(e))
         except Exception as e:
@@ -357,6 +380,7 @@ class Downloader:
             
             if not item.cancelled:
                 self.event_bus.emit(Event.QUEUE_UPDATED, None)
+
     
     def _handle_cancellation(self, item: DownloadItem) -> None:
         """Handle download cancellation"""

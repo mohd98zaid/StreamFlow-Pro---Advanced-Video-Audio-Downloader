@@ -24,6 +24,7 @@ class QueueTab:
         self.stat_queued_val: Optional[ctk.CTkLabel] = None
         self.stat_active_val: Optional[ctk.CTkLabel] = None
         self.stat_paused_val: Optional[ctk.CTkLabel] = None
+        self.context_menu: Optional[tk.Menu] = None
         
         # Subscribe to events
         self.event_bus.subscribe(Event.DOWNLOAD_PROGRESS, lambda _: self.refresh())
@@ -70,45 +71,83 @@ class QueueTab:
         toolbar_inner = ctk.CTkFrame(toolbar_card, fg_color="transparent")
         toolbar_inner.pack(fill=tk.X, padx=12, pady=10)
         
+        # Start Engine
         ctk.CTkButton(
             toolbar_inner,
             text="Start Engine",
+            width=100,
             fg_color=("#2563EB", "#3B82F6"),
             hover_color=("#1D4ED8", "#2563EB"),
             command=self.start_queue
-        ).pack(side=tk.LEFT, padx=(0, 6))
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Single-Item Controls
+        ctk.CTkButton(
+            toolbar_inner,
+            text="⏸️ Pause Selected",
+            width=115,
+            fg_color=("#D97706", "#F59E0B"),
+            hover_color=("#B45309", "#D97706"),
+            text_color="#FFFFFF",
+            command=self.pause_selected
+        ).pack(side=tk.LEFT, padx=3)
         
         ctk.CTkButton(
             toolbar_inner,
+            text="▶️ Resume Selected",
+            width=120,
+            fg_color=("#059669", "#10B981"),
+            hover_color=("#047857", "#059669"),
+            text_color="#FFFFFF",
+            command=self.resume_selected
+        ).pack(side=tk.LEFT, padx=3)
+        
+        ctk.CTkButton(
+            toolbar_inner,
+            text="⏹️ Stop Selected",
+            width=110,
+            fg_color=("#DC2626", "#EF4444"),
+            hover_color=("#B91C1C", "#DC2626"),
+            text_color="#FFFFFF",
+            command=self.stop_selected
+        ).pack(side=tk.LEFT, padx=3)
+        
+        # Bulk Controls
+        ctk.CTkButton(
+            toolbar_inner,
             text="Pause All",
+            width=80,
             fg_color=("gray85", "#334155"),
             text_color=("gray10", "#F8FAFC"),
             command=self.pause_all
-        ).pack(side=tk.LEFT, padx=4)
+        ).pack(side=tk.LEFT, padx=3)
         
         ctk.CTkButton(
             toolbar_inner,
             text="Resume All",
+            width=85,
             fg_color=("gray85", "#334155"),
             text_color=("gray10", "#F8FAFC"),
             command=self.resume_all
-        ).pack(side=tk.LEFT, padx=4)
+        ).pack(side=tk.LEFT, padx=3)
         
         ctk.CTkButton(
             toolbar_inner,
             text="Clear Finished",
+            width=100,
             fg_color=("gray85", "#334155"),
             text_color=("gray10", "#F8FAFC"),
             command=self.clear_finished
-        ).pack(side=tk.LEFT, padx=4)
+        ).pack(side=tk.LEFT, padx=3)
         
         ctk.CTkButton(
             toolbar_inner,
-            text="Remove Selected",
-            fg_color=("#DC2626", "#EF4444"),
-            hover_color=("#B91C1C", "#DC2626"),
+            text="🗑️ Remove Selected",
+            width=125,
+            fg_color=("gray75", "#475569"),
+            hover_color=("gray65", "#334155"),
             command=self.remove_selected
-        ).pack(side=tk.RIGHT, padx=4)
+        ).pack(side=tk.RIGHT, padx=2)
         
         # 3. LIVE QUEUE MATRIX CARD
         matrix_card = ctk.CTkFrame(main_container, corner_radius=10)
@@ -116,7 +155,7 @@ class QueueTab:
         
         ctk.CTkLabel(
             matrix_card,
-            text="Live Queue Download Matrix",
+            text="Live Queue Download Matrix (Right-click or Double-click to control individual downloads)",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold")
         ).pack(anchor="w", padx=14, pady=(10, 6))
         
@@ -155,8 +194,124 @@ class QueueTab:
         self.queue_tree.tag_configure("COMPLETED", foreground="#10B981")
         self.queue_tree.tag_configure("FAILED", foreground="#EF4444")
         self.queue_tree.tag_configure("PAUSED", foreground="#F59E0B")
-        self.queue_tree.tag_configure("QUEUED", foreground="#94A3B8")
+        self.queue_tree.tag_configure("CANCELLED", foreground="#94A3B8")
+        self.queue_tree.tag_configure("QUEUED", foreground="#CBD5E1")
+        
+        # Create Right-Click Context Menu
+        self.create_context_menu()
+        self.queue_tree.bind("<Button-3>", self.show_context_menu)
+        self.queue_tree.bind("<Double-1>", self.on_double_click)
     
+    def create_context_menu(self) -> None:
+        """Create right-click context menu for individual items"""
+        self.context_menu = tk.Menu(self.frame, tearoff=0)
+        self.context_menu.add_command(label="⏸️ Pause Selected", command=self.pause_selected)
+        self.context_menu.add_command(label="▶️ Resume Selected", command=self.resume_selected)
+        self.context_menu.add_command(label="⏹️ Stop / Cancel Selected", command=self.stop_selected)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="🗑️ Remove from Queue", command=self.remove_selected)
+        self.context_menu.add_command(label="📋 Copy Video URL", command=self.copy_url)
+
+    def show_context_menu(self, event) -> None:
+        """Display right-click context menu on selected row"""
+        row_id = self.queue_tree.identify_row(event.y)
+        if row_id:
+            if row_id not in self.queue_tree.selection():
+                self.queue_tree.selection_set(row_id)
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+
+    def on_double_click(self, event) -> None:
+        """Double click to toggle pause/resume on the clicked item"""
+        row_id = self.queue_tree.identify_row(event.y)
+        if not row_id:
+            return
+        
+        with self.downloader.download_queue.lock:
+            for item in self.downloader.download_queue.items:
+                if item.id == row_id:
+                    if item.status == DownloadStatus.PAUSED.value:
+                        item.paused = False
+                        item.status = DownloadStatus.QUEUED.value
+                        self.event_bus.emit(Event.LOG_MESSAGE, f"▶️ Resumed: {item.title}")
+                    else:
+                        item.paused = True
+                        item.status = DownloadStatus.PAUSED.value
+                        self.event_bus.emit(Event.LOG_MESSAGE, f"⏸️ Paused: {item.title}")
+                    break
+        
+        self.refresh()
+        self.event_bus.emit(Event.QUEUE_UPDATED, None)
+
+    def pause_selected(self) -> None:
+        """Pause selected item(s)"""
+        selection = self.queue_tree.selection()
+        if not selection:
+            return
+        
+        with self.downloader.download_queue.lock:
+            for iid in selection:
+                for item in self.downloader.download_queue.items:
+                    if item.id == iid:
+                        item.paused = True
+                        item.status = DownloadStatus.PAUSED.value
+                        self.event_bus.emit(Event.LOG_MESSAGE, f"⏸️ Paused: {item.title}")
+                        break
+        
+        self.refresh()
+        self.event_bus.emit(Event.QUEUE_UPDATED, None)
+
+    def resume_selected(self) -> None:
+        """Resume selected item(s)"""
+        selection = self.queue_tree.selection()
+        if not selection:
+            return
+        
+        with self.downloader.download_queue.lock:
+            for iid in selection:
+                for item in self.downloader.download_queue.items:
+                    if item.id == iid:
+                        item.paused = False
+                        item.cancelled = False
+                        item.status = DownloadStatus.QUEUED.value
+                        self.event_bus.emit(Event.LOG_MESSAGE, f"▶️ Resumed: {item.title}")
+                        break
+        
+        self.downloader.start_queue_processor()
+        self.refresh()
+        self.event_bus.emit(Event.QUEUE_UPDATED, None)
+
+    def stop_selected(self) -> None:
+        """Stop / Cancel selected item(s)"""
+        selection = self.queue_tree.selection()
+        if not selection:
+            return
+        
+        with self.downloader.download_queue.lock:
+            for iid in selection:
+                for item in self.downloader.download_queue.items:
+                    if item.id == iid:
+                        item.cancelled = True
+                        item.status = DownloadStatus.CANCELLED.value
+                        self.event_bus.emit(Event.LOG_MESSAGE, f"⏹️ Stopped: {item.title}")
+                        break
+        
+        self.refresh()
+        self.event_bus.emit(Event.QUEUE_UPDATED, None)
+
+    def copy_url(self) -> None:
+        """Copy URL of selected item to clipboard"""
+        selection = self.queue_tree.selection()
+        if not selection:
+            return
+        
+        with self.downloader.download_queue.lock:
+            for item in self.downloader.download_queue.items:
+                if item.id == selection[0]:
+                    self.frame.clipboard_clear()
+                    self.frame.clipboard_append(item.url)
+                    self.event_bus.emit(Event.LOG_MESSAGE, f"📋 Copied URL: {item.url}")
+                    break
+
     def start_queue(self) -> None:
         """Start queue processing"""
         self.downloader.start_queue_processor()
@@ -167,12 +322,11 @@ class QueueTab:
         """Pause all queued items"""
         with self.downloader.download_queue.lock:
             for item in self.downloader.download_queue.items:
-                if item.status == DownloadStatus.QUEUED.value:
-                    item.paused = True
-                    item.status = DownloadStatus.PAUSED.value
+                item.paused = True
+                item.status = DownloadStatus.PAUSED.value
         
         self.refresh()
-        self.event_bus.emit(Event.LOG_MESSAGE, "Paused all queued items")
+        self.event_bus.emit(Event.LOG_MESSAGE, "Paused all queue items")
     
     def resume_all(self) -> None:
         """Resume all paused items"""
@@ -182,6 +336,7 @@ class QueueTab:
                     item.paused = False
                     item.status = DownloadStatus.QUEUED.value
         
+        self.downloader.start_queue_processor()
         self.refresh()
         self.event_bus.emit(Event.LOG_MESSAGE, "Resumed all paused items")
     
@@ -192,7 +347,7 @@ class QueueTab:
         self.event_bus.emit(Event.LOG_MESSAGE, f"Cleared {count} completed downloads from queue")
 
     def remove_selected(self) -> None:
-        """Remove selected items from queue"""
+        """Remove selected items from queue (stopping if active)"""
         selection = self.queue_tree.selection()
         if not selection:
             return
@@ -201,18 +356,19 @@ class QueueTab:
             for iid in selection:
                 for item in self.downloader.download_queue.items[:]:
                     if item.id == iid:
-                        if item.status not in [DownloadStatus.DOWNLOADING.value, 
-                                              DownloadStatus.PROCESSING.value]:
-                            self.downloader.download_queue.remove(item)
-                            self.event_bus.emit(Event.LOG_MESSAGE, f"Removed: {item.url}")
-                        else:
-                            self.event_bus.emit(Event.LOG_MESSAGE, f"⚠️ Cannot remove active download: {item.title}")
+                        item.cancelled = True
+                        self.downloader.download_queue.remove(item)
+                        self.event_bus.emit(Event.LOG_MESSAGE, f"🗑️ Removed: {item.title or item.url}")
                         break
         
         self.refresh()
+        self.event_bus.emit(Event.QUEUE_UPDATED, None)
     
     def refresh(self) -> None:
         """Refresh queue tree display and metrics"""
+        if not self.queue_tree:
+            return
+            
         with self.downloader.download_queue.lock:
             items = list(self.downloader.download_queue.items)
         
@@ -258,5 +414,3 @@ class QueueTab:
         # Remove items that are no longer in queue
         for iid in existing_iids - current_iids:
             self.queue_tree.delete(iid)
-
-
