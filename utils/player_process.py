@@ -326,7 +326,7 @@ CINEMA_JS = """
         }
 
         let isFull = false;
-        let isCinema = true;
+        let isCinema = window.location.search.includes('v=');
         let isHovered = false;
         let isDownloading = false;
         let hideTimer;
@@ -334,6 +334,15 @@ CINEMA_JS = """
         const fsBtn = document.getElementById('agFsBtn');
         const modeBtn = document.getElementById('agModeBtn');
         const dlBtn = document.getElementById('agDlBtn');
+
+        if (!isCinema && cinemaStyle) {
+            cinemaStyle.disabled = true;
+            if (modeBtn) {
+                modeBtn.textContent = '🎬 Cinema View';
+                modeBtn.style.background = 'rgba(37, 99, 235, 0.92)';
+            }
+        }
+
 
         function updateFullscreenState(state) {
             isFull = state;

@@ -190,6 +190,21 @@ class AdvancedDownloaderApp:
         )
         self.folder_btn.pack(side=tk.RIGHT, padx=6)
 
+        # Open YouTube Button
+        self.youtube_btn = ctk.CTkButton(
+            header_actions,
+            text="▶️ Open YouTube",
+            width=135,
+            height=32,
+            fg_color=("#DC2626", "#EF4444"),
+            hover_color=("#B91C1C", "#DC2626"),
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            command=self.open_youtube_browser
+        )
+        self.youtube_btn.pack(side=tk.RIGHT, padx=6)
+
+
         # Main Segmented TabView (CTkTabview) with high-contrast font styling
         self.tabview = ctk.CTkTabview(
             self.root,
@@ -442,7 +457,17 @@ class AdvancedDownloaderApp:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to import queue: {e}")
     
+    def open_youtube_browser(self) -> None:
+        """Directly open YouTube in the dedicated ad-free player browser"""
+        try:
+            from gui.video_preview_modal import open_ad_free_player
+            open_ad_free_player("https://www.youtube.com", "YouTube Browser")
+            self.on_log_message("🌐 Opened Ad-Free YouTube Browser")
+        except Exception as e:
+            logging.error(f"Failed to open YouTube browser: {e}")
+
     def clear_completed(self) -> None:
+
         """Clear completed downloads from queue"""
         count = self.downloader.download_queue.clear_completed()
         if count > 0:
