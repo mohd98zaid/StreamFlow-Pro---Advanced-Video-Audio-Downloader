@@ -47,91 +47,41 @@ class PlayerApi:
         return bool(active_window and active_window.fullscreen)
 
     def download_current_video(self, url_or_id):
-        """Download currently playing video in background using user settings"""
+        """Send current video download request to the main application queue"""
         global is_downloading
-        if is_downloading:
-            return {"status": "busy", "message": "Download already in progress"}
-        
-        target_url = url_or_id
-        if not target_url.startswith("http"):
-            target_url = f"https://www.youtube.com/watch?v={url_or_id}"
+        try:
+            target_url = url_or_id.strip() if url_or_id else ""
+            if not target_url:
+                if active_window:
+                    active_window.evaluate_js("if(window.onDownloadComplete) window.onDownloadComplete(false, 'Play a video first!');")
+                return {"status": "error", "message": "Play a video first"}
             
-        def run_download():
-            global is_downloading
-            is_downloading = True
-            try:
-                cfg = ConfigManager().config
-                download_path = cfg.get("download_path", str(Path.home() / "Downloads"))
-                Path(download_path).mkdir(parents=True, exist_ok=True)
-                
-                embed_thumb = cfg.get("embed_thumbnail", True)
-                embed_meta = cfg.get("embed_metadata", True)
-                
-                ydl_opts = {
-                    'format': 'bestvideo+bestaudio/best',
-                    'merge_output_format': 'mp4',
-                    'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
-                    'quiet': True,
-                    'no_warnings': True,
-                    'nocheckcertificate': True,
-                    'retries': 10,
-                    'fragment_retries': 10,
-                    'extractor_args': {
-                        'youtube': {
-                            'player_client': ['android', 'ios', 'web']
-                        }
-                    },
-                    'writethumbnail': embed_thumb,
-                }
-                
-                postprocessors = []
-                if embed_thumb:
-                    postprocessors.append({'key': 'EmbedThumbnail'})
-                if embed_meta:
-                    postprocessors.append({'key': 'FFmpegMetadata'})
-                if postprocessors:
-                    ydl_opts['postprocessors'] = postprocessors
+            # If YouTube URL, extract strictly the single video ID
+            if "youtube.com" in target_url or "youtu.be" in target_url:
+                v_match = re.search(r'(?:v=|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})', target_url)
+                if v_match:
+                    target_url = f"https://www.youtube.com/watch?v={v_match.group(1)}"
+                else:
+                    if active_window:
+                        active_window.evaluate_js("if(window.onDownloadComplete) window.onDownloadComplete(false, 'Play a video first!');")
+                    return {"status": "error", "message": "Play a video first"}
+            
+            # Send to SQLite inbox_queue so the main application active queue picks it up immediately
+            db = DatabaseManager()
+            db.add_to_inbox(target_url, title="", download_type="video", quality="Best Available")
+            logging.info(f"Queued single video download to main app: {target_url}")
+            
+            if active_window:
+                active_window.evaluate_js("if(window.onDownloadComplete) window.onDownloadComplete(true, 'Added to Download Queue!');")
+            
+            return {"status": "queued", "message": "Added to Download Queue"}
+        except Exception as e:
+            logging.error(f"Error queueing player download: {e}")
+            if active_window:
+                clean_msg = str(e).replace("'", "").replace('"', '')[:30]
+                active_window.evaluate_js(f"if(window.onDownloadComplete) window.onDownloadComplete(false, '{clean_msg}');")
+            return {"status": "error", "message": str(e)}
 
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(target_url, download=True)
-                    title = info.get('title', 'Video')
-                    channel = info.get('uploader') or info.get('channel') or ''
-                    duration = str(info.get('duration', ''))
-                    
-                    # Record in SQLite history
-                    try:
-                        db = DatabaseManager()
-                        item = DownloadItem(
-                            url=target_url,
-                            title=title,
-                            download_type="video",
-                            quality="Best (Auto)",
-                            status=DownloadStatus.COMPLETED,
-                            progress=100.0,
-                            file_path=os.path.join(download_path, f"{title}.mp4"),
-                            completed_at=time.strftime('%Y-%m-%d %H:%M:%S'),
-                            channel=channel,
-                            duration=duration
-                        )
-                        db.add_download(item)
-                    except Exception as db_err:
-                        logging.warning(f"History DB update error: {db_err}")
-                
-                # Notify frontend of completion
-                if active_window:
-                    active_window.evaluate_js("if(window.onDownloadComplete) window.onDownloadComplete(true, 'Download Complete!');")
-            except Exception as e:
-                raw_err = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', str(e))
-                clean_err = re.sub(r'^(?:ERROR:\s*)+', '', raw_err).strip()
-                logging.error(f"Player download failed: {clean_err}")
-                clean_err_escaped = clean_err.replace("'", "\\'").replace('"', '\\"')
-                if active_window:
-                    active_window.evaluate_js(f"if(window.onDownloadComplete) window.onDownloadComplete(false, '{clean_err_escaped[:35]}');")
-            finally:
-                is_downloading = False
-
-        threading.Thread(target=run_download, daemon=True).start()
-        return {"status": "started", "message": "Download started in background"}
 
 
 def start_esc_listener():
@@ -274,7 +224,7 @@ CONTROLS_CSS = """
 }
 """
 
-CINEMA_JS = """
+CINEMA_JS = r"""
 (function() {
     try {
         // Controls Base Styling
@@ -378,16 +328,57 @@ CINEMA_JS = """
             });
         }
 
+        function getCleanVideoUrl() {
+            try {
+                const url = new URL(window.location.href);
+                // 1. Standard YouTube Watch URL: extract strictly the video ID
+                const v = url.searchParams.get('v');
+                if (v && v.length >= 10) {
+                    return 'https://www.youtube.com/watch?v=' + v;
+                }
+                
+                // 2. YouTube Shorts
+                if (url.pathname.includes('/shorts/')) {
+                    const shortId = url.pathname.split('/shorts/')[1].split('/')[0].split('?')[0];
+                    if (shortId) return 'https://www.youtube.com/watch?v=' + shortId;
+                }
+                
+                // 3. YouTube Embed or youtu.be
+                if (url.hostname.includes('youtu.be')) {
+                    const shortId = url.pathname.replace(/^\//, '').split('?')[0];
+                    if (shortId) return 'https://www.youtube.com/watch?v=' + shortId;
+                }
+                
+                // 4. Non-YouTube URLs (Instagram, TikTok, Vimeo, Twitter, direct MP4)
+                if (!url.hostname.includes('youtube.com')) {
+                    return window.location.href;
+                }
+            } catch(e) {}
+            return null;
+        }
+
         if (dlBtn) {
             dlBtn.addEventListener('click', () => {
                 if (isDownloading) return;
-                const currentUrl = window.location.href;
+                const cleanUrl = getCleanVideoUrl();
+                if (!cleanUrl) {
+                    dlBtn.textContent = '⚠️ Play a video first!';
+                    dlBtn.style.background = 'rgba(220, 38, 38, 0.92)';
+                    setTimeout(() => {
+                        if (dlBtn && !isDownloading) {
+                            dlBtn.textContent = '⬇️ Download Video';
+                            dlBtn.style.background = 'rgba(16, 185, 129, 0.92)';
+                        }
+                    }, 3000);
+                    return;
+                }
+
                 isDownloading = true;
-                dlBtn.textContent = '⏳ Downloading...';
+                dlBtn.textContent = '⏳ Adding to Queue...';
                 dlBtn.style.background = 'rgba(234, 88, 12, 0.92)';
                 
                 if (window.pywebview && window.pywebview.api) {
-                    window.pywebview.api.download_current_video(currentUrl);
+                    window.pywebview.api.download_current_video(cleanUrl);
                 }
             });
         }
@@ -396,10 +387,10 @@ CINEMA_JS = """
             isDownloading = false;
             if (dlBtn) {
                 if (success) {
-                    dlBtn.textContent = '✅ Saved to Downloads!';
+                    dlBtn.textContent = '✅ ' + (msg || 'Added to Queue!');
                     dlBtn.style.background = 'rgba(16, 185, 129, 0.92)';
                 } else {
-                    dlBtn.textContent = '⚠️ ' + msg;
+                    dlBtn.textContent = '⚠️ ' + (msg || 'Failed');
                     dlBtn.style.background = 'rgba(220, 38, 38, 0.92)';
                 }
                 setTimeout(() => {
@@ -407,9 +398,10 @@ CINEMA_JS = """
                         dlBtn.textContent = '⬇️ Download Video';
                         dlBtn.style.background = 'rgba(16, 185, 129, 0.92)';
                     }
-                }, 4000);
+                }, 3500);
             }
         };
+
 
         // 2-Second Inactivity Auto-Fade
         controls.addEventListener('mouseenter', () => {

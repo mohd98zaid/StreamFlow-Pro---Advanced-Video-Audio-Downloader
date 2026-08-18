@@ -410,10 +410,54 @@ class Downloader:
             self.database.add_download(item)
             self.event_bus.emit(Event.DOWNLOAD_FAILED, item)
     
+    def check_inbox_queue(self) -> None:
+        """Check for downloads requested by external processes (e.g. video preview player) and add to active queue"""
+        try:
+            inbox_items = self.database.fetch_and_clear_inbox()
+            if not inbox_items:
+                return
+            
+            cfg = self.config.config if hasattr(self.config, 'config') else {}
+            download_path = cfg.get("download_path", str(Path.home() / "Downloads"))
+            filename_pattern = cfg.get("filename_pattern", "%(title)s.%(ext)s")
+            output_template = os.path.join(download_path, filename_pattern)
+            
+            options = {
+                'format_type': cfg.get('audio_format', 'mp3'),
+                'embed_thumbnail': cfg.get('embed_thumbnail', True),
+                'embed_metadata': cfg.get('embed_metadata', True),
+                'embed_subtitles': cfg.get('embed_subtitles', False),
+            }
+            
+            for req in inbox_items:
+                url = req['url']
+                dl_type = req.get('download_type', 'video')
+                quality = req.get('quality', cfg.get('quality_preset', 'Best Available'))
+                
+                item = DownloadItem(
+                    url=url,
+                    download_type=dl_type,
+                    quality=quality,
+                    options=options,
+                    output_template=output_template
+                )
+                if req.get('title'):
+                    item.title = req['title']
+                
+                self.download_queue.add(item)
+                self.log(f"📥 Added from Player to Queue: {item.title or item.url}")
+                self.event_bus.emit(Event.QUEUE_UPDATED, None)
+                
+        except Exception as e:
+            logging.error(f"Error checking inbox queue: {e}")
+
     def queue_processor(self) -> None:
         """Process download queue with concurrent downloads"""
         while self.running:
             try:
+                # 1. Ingest any external download requests (e.g. from preview player)
+                self.check_inbox_queue()
+                
                 if not self.stop_download:
                     # Check how many downloads are active
                     with self.active_downloads_lock:
@@ -435,6 +479,7 @@ class Downloader:
             except Exception as e:
                 logging.error(f"Queue processor error: {e}")
                 time.sleep(1)
+
     
     def start_queue_processor(self) -> None:
         """Start the queue processor"""

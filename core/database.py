@@ -64,6 +64,18 @@ class DatabaseManager:
             )
         ''')
         
+        # Create inbox_queue table for inter-process queue requests (e.g. from player/browser)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS inbox_queue (
+                id TEXT PRIMARY KEY,
+                url TEXT NOT NULL,
+                title TEXT,
+                download_type TEXT,
+                quality TEXT,
+                created_at TEXT
+            )
+        ''')
+        
         # Create indexes for better query performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_status ON downloads(status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_created_at ON downloads(created_at DESC)')
@@ -72,6 +84,48 @@ class DatabaseManager:
         
         self.conn.commit()
         logging.info("Database initialized successfully")
+    
+    def add_to_inbox(self, url: str, title: str = "", download_type: str = "video", quality: str = "Best Available") -> None:
+        """Add a download request from external process (e.g. video preview player)"""
+        try:
+            import uuid
+            cursor = self.conn.cursor()
+            item_id = str(uuid.uuid4())
+            created_at = datetime.now().isoformat()
+            cursor.execute('''
+                INSERT INTO inbox_queue (id, url, title, download_type, quality, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (item_id, url, title, download_type, quality, created_at))
+            self.conn.commit()
+        except Exception as e:
+            logging.error(f"Error adding to inbox_queue: {e}")
+
+    def fetch_and_clear_inbox(self) -> List[Dict[str, Any]]:
+        """Fetch all pending inbox download requests and clear them from table"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT * FROM inbox_queue ORDER BY created_at ASC')
+            rows = cursor.fetchall()
+            if not rows:
+                return []
+            
+            items = []
+            for row in rows:
+                items.append({
+                    'id': row['id'],
+                    'url': row['url'],
+                    'title': row['title'],
+                    'download_type': row['download_type'],
+                    'quality': row['quality']
+                })
+            
+            cursor.execute('DELETE FROM inbox_queue')
+            self.conn.commit()
+            return items
+        except Exception as e:
+            logging.error(f"Error fetching inbox_queue: {e}")
+            return []
+
     
     def add_download(self, item: DownloadItem) -> None:
         """Add or update download item in database"""
