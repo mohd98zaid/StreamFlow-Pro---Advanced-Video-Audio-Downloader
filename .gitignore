@@ -2,30 +2,63 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.spec
 
 # Logs and databases
 *.log
 downloader.log
 *.sqlite
+*.sqlite3
 *.db
+*.db-journal
 
-# Virtual environments
-venv/
-.venv/
+# Virtual Environments
+.env
+.venv
 env/
+venv/
 ENV/
+env.bak/
+venv.bak/
 
-# IDE / Editor configs
-.vscode/
+# IDE / Editor configuration
 .idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
 .agents/
+.gemini/
 
-# Temporary and download files
+# Operating System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Nn]ecessary/
+
+# Temporary files
 *.tmp
-downloads/
+*.temp
 temp/
-
-# PyInstaller / build outputs
-build/
-dist/
-*.spec
+scratch/
