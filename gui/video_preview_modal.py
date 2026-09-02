@@ -39,6 +39,8 @@ def open_ad_free_player(video_id: str, title: str = "Video Preview"):
         except Exception as e:
             logging.error(f"Failed to launch webview player process: {e}")
 
+    # If pywebview is missing, warn the user
+    logging.warning("pywebview is not available. Please install 'pywebview' (pip install pywebview) to enable in-app ad-free playback.")
     # Fallback to privacy-enhanced browser embed
     embed_url = f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=1&modestbranding=1&rel=0"
     webbrowser.open(embed_url)

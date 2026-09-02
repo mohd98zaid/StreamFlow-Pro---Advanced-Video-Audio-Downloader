@@ -36,6 +36,16 @@ def check_dependencies():
         import static_ffmpeg
     except ImportError:
         missing.append("static-ffmpeg")
+
+    try:
+        import customtkinter
+    except ImportError:
+        missing.append("customtkinter")
+
+    try:
+        import webview
+    except ImportError:
+        missing.append("pywebview")
     
     # Optional but recommended packages
     try:
