@@ -1,6 +1,7 @@
 """
 Enhanced downloader with concurrent download support and event-driven architecture.
 """
+import os
 import threading
 import time
 import logging
@@ -10,6 +11,12 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional, Callable, Dict, Any
 import yt_dlp
+
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except ImportError:
+    pass
 
 from .models import DownloadItem, DownloadQueue, DownloadStatus
 from .events import EventBus, Event
@@ -74,14 +81,8 @@ class Downloader:
             'nocheckcertificate': True,
             'retries': 10,
             'fragment_retries': 10,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'ios', 'web']
-                }
-            },
         }
 
-        
         # Rate limiting
         if item.options.get('limit_rate') and item.options.get('rate_limit'):
             rate_value = self.parse_rate_limit(item.options['rate_limit'])
@@ -94,7 +95,7 @@ class Downloader:
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': item.options.get('format_type', 'mp3'),
-                'preferredquality': '192',
+                'preferredquality': '320',  # Studio quality 320 kbps
             }]
             if item.options.get('embed_metadata'):
                 ydl_opts['postprocessors'].append({'key': 'FFmpegMetadata'})
@@ -104,28 +105,33 @@ class Downloader:
         
         # Video downloads
         else:
+            # Ensure FFmpeg merges best video and best audio into a pristine MP4 container
+            ydl_opts['merge_output_format'] = 'mp4'
+            
             quality_format_map = {
-                'Best Available': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best',
-                '2160p (4K)': 'bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[height<=2160][ext=mp4]/bestvideo[height<=2160]+bestaudio/best[height<=2160]/best',
-                '2160p': 'bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[height<=2160][ext=mp4]/bestvideo[height<=2160]+bestaudio/best[height<=2160]/best',
-                '1440p (2K)': 'bestvideo[height<=1440][ext=mp4]+bestaudio[ext=m4a]/best[height<=1440][ext=mp4]/bestvideo[height<=1440]+bestaudio/best[height<=1440]/best',
-                '1440p': 'bestvideo[height<=1440][ext=mp4]+bestaudio[ext=m4a]/best[height<=1440][ext=mp4]/bestvideo[height<=1440]+bestaudio/best[height<=1440]/best',
-                '1080p (Full HD)': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-                '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-                '720p (HD)': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
-                '720p': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
-                '480p': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/bestvideo[height<=480]+bestaudio/best[height<=480]/best',
-                '360p': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/bestvideo[height<=360]+bestaudio/best[height<=360]/best',
-                'Worst': 'worstvideo[ext=mp4]+bestaudio[ext=m4a]/worst[ext=mp4]/worstvideo+bestaudio/worst'
+                'Best Available': 'bestvideo+bestaudio/best',
+                '2160p (4K)': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]/best',
+                '2160p': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]/best',
+                '1440p (2K)': 'bestvideo[height<=1440]+bestaudio/best[height<=1440]/best',
+                '1440p': 'bestvideo[height<=1440]+bestaudio/best[height<=1440]/best',
+                '1080p (Full HD)': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+                '1080p': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+                '720p (HD)': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+                '720p': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+                '480p': 'bestvideo[height<=480]+bestaudio/best[height<=480]/best',
+                '360p': 'bestvideo[height<=360]+bestaudio/best[height<=360]/best',
+                'Worst': 'worstvideo+worstaudio/worst'
             }
             
             selected_quality = item.quality
             if selected_quality not in quality_format_map:
-                match = re.search(r'(\d+p)', selected_quality)
+                match = re.search(r'(\d+p)', str(selected_quality))
                 if match:
-                    selected_quality = match.group(1)
+                    p_val = match.group(1)
+                    num_val = re.sub(r'\D', '', p_val)
+                    quality_format_map[selected_quality] = f'bestvideo[height<={num_val}]+bestaudio/best[height<={num_val}]/best'
             
-            default_format = 'best[ext=mp4]/best'
+            default_format = 'bestvideo+bestaudio/best'
             ydl_opts['format'] = quality_format_map.get(selected_quality, default_format)
             
             logging.info(f"Quality: {item.quality} -> Format: {ydl_opts['format']}")
@@ -417,22 +423,21 @@ class Downloader:
             if not inbox_items:
                 return
             
-            cfg = self.config.config if hasattr(self.config, 'config') else {}
-            download_path = cfg.get("download_path", str(Path.home() / "Downloads"))
-            filename_pattern = cfg.get("filename_pattern", "%(title)s.%(ext)s")
+            download_path = self.config_manager.get("download_path", str(Path.home() / "Downloads"))
+            filename_pattern = self.config_manager.get("filename_pattern", "%(title)s.%(ext)s")
             output_template = os.path.join(download_path, filename_pattern)
             
             options = {
-                'format_type': cfg.get('audio_format', 'mp3'),
-                'embed_thumbnail': cfg.get('embed_thumbnail', True),
-                'embed_metadata': cfg.get('embed_metadata', True),
-                'embed_subtitles': cfg.get('embed_subtitles', False),
+                'format_type': self.config_manager.get('audio_format', 'mp3'),
+                'embed_thumbnail': self.config_manager.get('embed_thumbnail', True),
+                'embed_metadata': self.config_manager.get('embed_metadata', True),
+                'embed_subtitles': self.config_manager.get('embed_subtitles', False),
             }
             
             for req in inbox_items:
                 url = req['url']
                 dl_type = req.get('download_type', 'video')
-                quality = req.get('quality', cfg.get('quality_preset', 'Best Available'))
+                quality = req.get('quality', self.config_manager.get('quality_preset', 'Best Available'))
                 
                 item = DownloadItem(
                     url=url,
@@ -445,6 +450,7 @@ class Downloader:
                     item.title = req['title']
                 
                 self.download_queue.add(item)
+                self.database.add_download(item)
                 self.log(f"📥 Added from Player to Queue: {item.title or item.url}")
                 self.event_bus.emit(Event.QUEUE_UPDATED, None)
                 

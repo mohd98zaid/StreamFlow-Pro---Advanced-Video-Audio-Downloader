@@ -46,11 +46,12 @@ class PlayerApi:
         global active_window
         return bool(active_window and active_window.fullscreen)
 
-    def download_current_video(self, url_or_id):
+    def download_current_video(self, url_or_id, title=""):
         """Send current video download request to the main application queue"""
         global is_downloading
         try:
-            target_url = url_or_id.strip() if url_or_id else ""
+            target_url = str(url_or_id).strip() if url_or_id else ""
+            video_title = str(title).strip() if title else ""
             if not target_url:
                 if active_window:
                     active_window.evaluate_js("if(window.onDownloadComplete) window.onDownloadComplete(false, 'Play a video first!');")
@@ -68,8 +69,8 @@ class PlayerApi:
             
             # Send to SQLite inbox_queue so the main application active queue picks it up immediately
             db = DatabaseManager()
-            db.add_to_inbox(target_url, title="", download_type="video", quality="Best Available")
-            logging.info(f"Queued single video download to main app: {target_url}")
+            db.add_to_inbox(target_url, title=video_title, download_type="video", quality="Best Available")
+            logging.info(f"Queued single video download to main app: {target_url} ({video_title})")
             
             if active_window:
                 active_window.evaluate_js("if(window.onDownloadComplete) window.onDownloadComplete(true, 'Added to Download Queue!');")
@@ -103,12 +104,73 @@ def start_esc_listener():
     t = threading.Thread(target=listener_loop, daemon=True)
     t.start()
 
+# Global permanent ad-blocker styles applied in both Cinema and Web View
+ADBLOCK_CSS = """
+/* ==========================================================================
+   StreamFlow Pro - Global Zero-Flicker AdBlock CSS Shield
+   ========================================================================== */
+
+/* Video Player Ad Overlays & Modules */
+.ytp-ad-module, 
+.video-ads, 
+.ytp-ad-overlay-container, 
+.ytp-ad-message-container,
+.ytp-ad-action-interstitial,
+.ytp-ad-preview-container,
+.ytp-ad-feedback-dialog-container,
+.ytp-ad-overlay-slot,
+.ytp-ad-text-overlay,
+.ytp-ad-image-overlay,
+#player-ads {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* Feed, Search, and Sidebar Sponsored Cards */
+ytd-promoted-sparkles-web-renderer,
+ytd-promoted-video-renderer,
+ytd-display-ad-renderer,
+ytd-statement-banner-renderer,
+ytd-banner-promo-renderer,
+ytd-in-feed-ad-layout-renderer,
+ytd-ad-slot-renderer,
+ytd-action-companion-ad-renderer,
+#masthead-ad,
+ytd-merch-shelf-renderer,
+ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"],
+/* Brave procedural cosmetic filters for empty grid slots */
+ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
+ytd-item-section-renderer:has(ytd-ad-slot-renderer),
+ytd-rich-section-renderer:has(ytd-statement-banner-renderer) {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    height: 0 !important;
+}
+
+/* YouTube Anti-Adblock & Premium Nag Modals */
+ytd-enforcement-message-view-model,
+tp-yt-paper-dialog:has(ytd-enforcement-message-view-model),
+tp-yt-paper-dialog:has(#feedback),
+tp-yt-paper-dialog:has(yt-upsell-dialog-renderer),
+yt-upsell-dialog-renderer,
+ytd-mealbar-promo-renderer {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+"""
+
 CINEMA_CSS = """
 /* Hide external YouTube UI: headers, sidebar recommendations, comments in Cinema Mode */
 #masthead-container, #masthead, #guide, #guide-wrapper, #secondary, #comments, 
-#below, #chat, #ticker, ytd-merch-shelf-renderer, ytd-banner-promo-renderer, 
-.ytp-ad-module, .video-ads, .ytp-ad-overlay-container, ytd-popup-container,
-#voice-search-button, #chips, ytd-feed-filter-chip-bar-renderer {
+#below, #chat, #ticker, #voice-search-button, #chips, ytd-feed-filter-chip-bar-renderer {
     display: none !important;
 }
 
@@ -227,13 +289,140 @@ CONTROLS_CSS = """
 CINEMA_JS = r"""
 (function() {
     try {
-        // Controls Base Styling
-        const controlsStyle = document.createElement('style');
-        controlsStyle.type = 'text/css';
-        controlsStyle.appendChild(document.createTextNode(`{controls_css}`));
-        (document.head || document.documentElement).appendChild(controlsStyle);
+        // =========================================================================
+        // BRAVE-STYLE JSON-PRUNING & PLAYER RESPONSE INTERCEPTION
+        // Intercepts and prunes adPlacements / playerAds before the player loads ads
+        // =========================================================================
+        function cleanPlayerResponse(obj) {
+            if (!obj || typeof obj !== 'object') return;
+            
+            // Delete root ad properties
+            if ('adPlacements' in obj) delete obj.adPlacements;
+            if ('playerAds' in obj) delete obj.playerAds;
+            if ('adSlots' in obj) delete obj.adSlots;
+            if ('adBreakHeartbeatParams' in obj) delete obj.adBreakHeartbeatParams;
+            
+            // Delete nested playerResponse ads
+            if (obj.playerResponse && typeof obj.playerResponse === 'object') {
+                if ('adPlacements' in obj.playerResponse) delete obj.playerResponse.adPlacements;
+                if ('playerAds' in obj.playerResponse) delete obj.playerResponse.playerAds;
+                if ('adSlots' in obj.playerResponse) delete obj.playerResponse.adSlots;
+            }
 
-        // Cinema Mode Dynamic Stylesheet
+            // Neutralize telemetry and ad playback beacons
+            if (obj.playbackTracking && typeof obj.playbackTracking === 'object') {
+                delete obj.playbackTracking.videostatsPlaybackUrl;
+                delete obj.playbackTracking.videostatsDelayplayUrl;
+                delete obj.playbackTracking.videostatsWatchtimeUrl;
+                delete obj.playbackTracking.ptrackingUrl;
+                delete obj.playbackTracking.qoeUrl;
+            }
+        }
+
+        // 1. Intercept and prune window.ytInitialPlayerResponse
+        try {
+            if (window.ytInitialPlayerResponse) {
+                cleanPlayerResponse(window.ytInitialPlayerResponse);
+            }
+            let _initialResponse = window.ytInitialPlayerResponse;
+            Object.defineProperty(window, 'ytInitialPlayerResponse', {
+                get() { return _initialResponse; },
+                set(val) {
+                    if (val && typeof val === 'object') {
+                        cleanPlayerResponse(val);
+                    }
+                    _initialResponse = val;
+                },
+                configurable: true
+            });
+        } catch(e) {}
+
+        // 2. Intercept window.fetch for /youtubei/v1/player (SPA video navigations)
+        try {
+            if (!window._fetchPatched) {
+                window._fetchPatched = true;
+                const originalFetch = window.fetch;
+                window.fetch = async function(...args) {
+                    const response = await originalFetch.apply(this, args);
+                    const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+                    if (url && (url.includes('/youtubei/v1/player') || url.includes('/youtubei/v1/browse'))) {
+                        try {
+                            const clone = response.clone();
+                            const json = await clone.json();
+                            if (json && typeof json === 'object') {
+                                cleanPlayerResponse(json);
+                                return new Response(JSON.stringify(json), {
+                                    status: response.status,
+                                    statusText: response.statusText,
+                                    headers: response.headers
+                                });
+                            }
+                        } catch(err) {}
+                    }
+                    return response;
+                };
+            }
+        } catch(e) {}
+
+        // 3. Intercept XMLHttpRequest for /youtubei/v1/player
+        try {
+            if (!window._xhrPatched) {
+                window._xhrPatched = true;
+                const originalXHROpen = XMLHttpRequest.prototype.open;
+                const originalXHRSend = XMLHttpRequest.prototype.send;
+                
+                XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+                    this._url = url;
+                    return originalXHROpen.apply(this, [method, url, ...rest]);
+                };
+                
+                XMLHttpRequest.prototype.send = function(...args) {
+                    if (this._url && this._url.includes('/youtubei/v1/player')) {
+                        this.addEventListener('readystatechange', function() {
+                            if (this.readyState === 4 && this.status === 200) {
+                                try {
+                                    const parsed = JSON.parse(this.responseText);
+                                    cleanPlayerResponse(parsed);
+                                    Object.defineProperty(this, 'responseText', {
+                                        value: JSON.stringify(parsed),
+                                        writable: false,
+                                        configurable: true
+                                    });
+                                    Object.defineProperty(this, 'response', {
+                                        value: JSON.stringify(parsed),
+                                        writable: false,
+                                        configurable: true
+                                    });
+                                } catch(err) {}
+                            }
+                        });
+                    }
+                    return originalXHRSend.apply(this, args);
+                };
+            }
+        } catch(e) {}
+
+        // 4. Inject Permanent Global Ad-Blocker Stylesheet
+        let adblockStyle = document.getElementById('antigravity-adblock-style');
+        if (!adblockStyle) {
+            adblockStyle = document.createElement('style');
+            adblockStyle.id = 'antigravity-adblock-style';
+            adblockStyle.type = 'text/css';
+            adblockStyle.appendChild(document.createTextNode(`{adblock_css}`));
+            (document.head || document.documentElement).appendChild(adblockStyle);
+        }
+
+        // 2. Inject Top Controls Styling
+        let controlsStyle = document.getElementById('antigravity-controls-style');
+        if (!controlsStyle) {
+            controlsStyle = document.createElement('style');
+            controlsStyle.id = 'antigravity-controls-style';
+            controlsStyle.type = 'text/css';
+            controlsStyle.appendChild(document.createTextNode(`{controls_css}`));
+            (document.head || document.documentElement).appendChild(controlsStyle);
+        }
+
+        // 3. Inject Cinema Mode Stylesheet (Toggable)
         let cinemaStyle = document.getElementById('antigravity-cinema-style');
         if (!cinemaStyle) {
             cinemaStyle = document.createElement('style');
@@ -243,7 +432,7 @@ CINEMA_JS = r"""
             (document.head || document.documentElement).appendChild(cinemaStyle);
         }
 
-        // Top Controls Container
+        // 4. Inject Top Controls Container
         let controls = document.getElementById('antigravity-top-controls');
         if (!controls) {
             controls = document.createElement('div');
@@ -275,7 +464,6 @@ CINEMA_JS = r"""
             document.body.appendChild(controls);
         }
 
-        let isFull = false;
         let isCinema = window.location.search.includes('v=');
         let isHovered = false;
         let isDownloading = false;
@@ -293,28 +481,28 @@ CINEMA_JS = r"""
             }
         }
 
-
         function updateFullscreenState(state) {
-            isFull = state;
-            if (isFull) {
-                fsBtn.textContent = '🗗 Exit Fullscreen (Esc)';
-                fsBtn.style.background = 'rgba(220, 38, 38, 0.92)';
-            } else {
-                fsBtn.textContent = '⛶ Maximize Screen';
-                fsBtn.style.background = 'rgba(15, 23, 42, 0.92)';
+            if (fsBtn) {
+                if (state) {
+                    fsBtn.textContent = '🗗 Exit Fullscreen (Esc)';
+                    fsBtn.style.background = 'rgba(220, 38, 38, 0.92)';
+                } else {
+                    fsBtn.textContent = '⛶ Maximize Screen';
+                    fsBtn.style.background = 'rgba(15, 23, 42, 0.92)';
+                }
             }
         }
 
         if (fsBtn) {
-            fsBtn.addEventListener('click', () => {
+            fsBtn.onclick = () => {
                 if (window.pywebview && window.pywebview.api) {
                     window.pywebview.api.toggle_fullscreen().then(updateFullscreenState);
                 }
-            });
+            };
         }
 
         if (modeBtn) {
-            modeBtn.addEventListener('click', () => {
+            modeBtn.onclick = () => {
                 isCinema = !isCinema;
                 if (isCinema) {
                     cinemaStyle.disabled = false;
@@ -325,43 +513,68 @@ CINEMA_JS = r"""
                     modeBtn.textContent = '🎬 Cinema View';
                     modeBtn.style.background = 'rgba(37, 99, 235, 0.92)';
                 }
-            });
+            };
         }
 
         function getCleanVideoUrl() {
             try {
+                // 1. Check active YouTube player API directly
+                const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                if (player && typeof player.getVideoData === 'function') {
+                    const data = player.getVideoData();
+                    if (data && data.video_id) {
+                        return {
+                            url: 'https://www.youtube.com/watch?v=' + data.video_id,
+                            title: data.title || ''
+                        };
+                    }
+                }
+
+                // 2. Parse current URL
                 const url = new URL(window.location.href);
-                // 1. Standard YouTube Watch URL: extract strictly the video ID
                 const v = url.searchParams.get('v');
+                let pageTitle = '';
+                const titleEl = document.querySelector('h1.ytd-video-primary-info-renderer, h1.ytd-watch-metadata, title');
+                if (titleEl) pageTitle = titleEl.textContent.replace(' - YouTube', '').trim();
+
                 if (v && v.length >= 10) {
-                    return 'https://www.youtube.com/watch?v=' + v;
+                    return {
+                        url: 'https://www.youtube.com/watch?v=' + v,
+                        title: pageTitle
+                    };
                 }
                 
-                // 2. YouTube Shorts
                 if (url.pathname.includes('/shorts/')) {
                     const shortId = url.pathname.split('/shorts/')[1].split('/')[0].split('?')[0];
-                    if (shortId) return 'https://www.youtube.com/watch?v=' + shortId;
+                    if (shortId) return {
+                        url: 'https://www.youtube.com/watch?v=' + shortId,
+                        title: pageTitle
+                    };
                 }
                 
-                // 3. YouTube Embed or youtu.be
                 if (url.hostname.includes('youtu.be')) {
                     const shortId = url.pathname.replace(/^\//, '').split('?')[0];
-                    if (shortId) return 'https://www.youtube.com/watch?v=' + shortId;
+                    if (shortId) return {
+                        url: 'https://www.youtube.com/watch?v=' + shortId,
+                        title: pageTitle
+                    };
                 }
                 
-                // 4. Non-YouTube URLs (Instagram, TikTok, Vimeo, Twitter, direct MP4)
                 if (!url.hostname.includes('youtube.com')) {
-                    return window.location.href;
+                    return {
+                        url: window.location.href,
+                        title: document.title || ''
+                    };
                 }
             } catch(e) {}
             return null;
         }
 
         if (dlBtn) {
-            dlBtn.addEventListener('click', () => {
+            dlBtn.onclick = () => {
                 if (isDownloading) return;
-                const cleanUrl = getCleanVideoUrl();
-                if (!cleanUrl) {
+                const videoInfo = getCleanVideoUrl();
+                if (!videoInfo || !videoInfo.url) {
                     dlBtn.textContent = '⚠️ Play a video first!';
                     dlBtn.style.background = 'rgba(220, 38, 38, 0.92)';
                     setTimeout(() => {
@@ -377,10 +590,33 @@ CINEMA_JS = r"""
                 dlBtn.textContent = '⏳ Adding to Queue...';
                 dlBtn.style.background = 'rgba(234, 88, 12, 0.92)';
                 
-                if (window.pywebview && window.pywebview.api) {
-                    window.pywebview.api.download_current_video(cleanUrl);
-                }
-            });
+                const triggerDownload = () => {
+                    if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.download_current_video === 'function') {
+                        window.pywebview.api.download_current_video(videoInfo.url, videoInfo.title);
+                    } else if (window.pywebviewApi && typeof window.pywebviewApi.download_current_video === 'function') {
+                        window.pywebviewApi.download_current_video(videoInfo.url, videoInfo.title);
+                    } else {
+                        // Fallback retry in case bridge is still hooking
+                        setTimeout(() => {
+                            if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.download_current_video === 'function') {
+                                window.pywebview.api.download_current_video(videoInfo.url, videoInfo.title);
+                            } else {
+                                isDownloading = false;
+                                dlBtn.textContent = '⚠️ Bridge Connecting...';
+                                dlBtn.style.background = 'rgba(220, 38, 38, 0.92)';
+                                setTimeout(() => {
+                                    if (dlBtn && !isDownloading) {
+                                        dlBtn.textContent = '⬇️ Download Video';
+                                        dlBtn.style.background = 'rgba(16, 185, 129, 0.92)';
+                                    }
+                                }, 2500);
+                            }
+                        }, 300);
+                    }
+                };
+
+                triggerDownload();
+            };
         }
 
         window.onDownloadComplete = function(success, msg) {
@@ -402,8 +638,7 @@ CINEMA_JS = r"""
             }
         };
 
-
-        // 2-Second Inactivity Auto-Fade
+        // 2-Second Inactivity Auto-Fade for Top Controls
         controls.addEventListener('mouseenter', () => {
             isHovered = true;
             controls.classList.remove('hidden');
@@ -429,30 +664,133 @@ CINEMA_JS = r"""
         window.addEventListener('mousedown', resetTimer);
         resetTimer();
 
-        // Auto-Play & Ad-Blocker Loop
-        setInterval(() => {
+        // =========================================================================
+        // HIGH-QUALITY SEAMLESS AD-BLOCKER & ANTI-DETECTION ENGINE
+        // =========================================================================
+        let isAdActive = false;
+        let originalPlaybackRate = 1.0;
+        let originalMuted = false;
+
+        function processAdBlocker() {
             try {
-                // Auto-skip video ads
-                const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button');
-                if (skipBtn) {
-                    skipBtn.click();
-                }
+                const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
                 const video = document.querySelector('video');
-                const ad = document.querySelector('.ad-showing, .ad-interrupting');
-                if (ad && video && !isNaN(video.duration)) {
-                    video.currentTime = video.duration;
+
+                // Intercept and sanitize internal player args
+                if (player && typeof player.getConfig === 'function') {
+                    try {
+                        const cfg = player.getConfig();
+                        if (cfg && cfg.args) {
+                            cleanPlayerResponse(cfg.args);
+                        }
+                    } catch(err) {}
                 }
 
-                // Auto-unmute & play if paused at start
-                if (video && video.paused && video.currentTime < 1) {
-                    video.play().catch(() => {});
+                // 1. Detect if an ad is actively playing
+                const hasAdClass = player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'));
+                const hasAdOverlay = !!document.querySelector('.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout');
+                const isAdPlaying = hasAdClass || hasAdOverlay;
+
+                if (isAdPlaying && video) {
+                    if (!isAdActive) {
+                        isAdActive = true;
+                        if (video.playbackRate >= 0.25 && video.playbackRate <= 3.0) {
+                            originalPlaybackRate = video.playbackRate;
+                        }
+                        originalMuted = video.muted;
+                    }
+
+                    // A. Mute instantly so high-speed ad audio is completely silent
+                    video.muted = true;
+
+                    // B. Accelerate ad to 16x speed (HTML5 spec max)
+                    // At 16x, ads complete smoothly in < 0.9s without triggering buffer crashes or anti-adblock bans
+                    if (video.playbackRate !== 16.0) {
+                        video.playbackRate = 16.0;
+                    }
+
+                    // C. Auto-click any skip button the instant it appears
+                    const skipSelectors = [
+                        '.ytp-ad-skip-button',
+                        '.ytp-ad-skip-button-modern',
+                        '.ytp-skip-ad-button',
+                        '.ytp-ad-skip-button-slot button',
+                        '.ytp-ad-skip-button-container button',
+                        'button[class*="ytp-ad-skip"]'
+                    ];
+                    for (const sel of skipSelectors) {
+                        const skipBtn = document.querySelector(sel);
+                        if (skipBtn && typeof skipBtn.click === 'function') {
+                            skipBtn.click();
+                            break;
+                        }
+                    }
+
+                    // D. Safe skip: If the video is confirmed to be an ad stream and duration is short (< 120s),
+                    // smoothly nudge near the end without crashing the player state
+                    if (!isNaN(video.duration) && video.duration > 0 && video.duration < 120) {
+                        if (video.currentTime < video.duration - 0.2) {
+                            video.currentTime = video.duration - 0.05;
+                        }
+                    }
+                } else {
+                    // Normal video playing
+                    if (isAdActive) {
+                        isAdActive = false;
+                        // Clean restoration of user's genuine playback rate and volume
+                        if (video) {
+                            video.playbackRate = originalPlaybackRate || 1.0;
+                            video.muted = originalMuted;
+                        }
+                    }
                 }
 
-                // Remove overlay promotions
-                const overlays = document.querySelectorAll('.ytp-ad-overlay-container, ytd-banner-promo-renderer, ytd-popup-container');
-                overlays.forEach(el => el.remove());
+                // 2. Auto-dismiss YouTube Anti-Adblock Warning Modals & "Continue Watching" dialogs
+                const dismissSelectors = [
+                    'ytd-enforcement-message-view-model #dismiss-button button',
+                    'tp-yt-paper-dialog:has(ytd-enforcement-message-view-model) #dismiss-button button',
+                    'tp-yt-paper-dialog #dismiss-button button',
+                    'yt-confirm-dialog-renderer #confirm-button button',
+                    '.ytp-ad-overlay-close-button'
+                ];
+                for (const dSel of dismissSelectors) {
+                    const dBtn = document.querySelector(dSel);
+                    if (dBtn && typeof dBtn.click === 'function') {
+                        dBtn.click();
+                    }
+                }
+
+                // Remove anti-adblock modal containers if they appear
+                const antiAdModals = document.querySelectorAll('ytd-enforcement-message-view-model, tp-yt-paper-dialog:has(ytd-enforcement-message-view-model)');
+                antiAdModals.forEach(m => m.remove());
+
+                // 3. Remove non-video promotional overlays
+                const promoOverlays = document.querySelectorAll('.ytp-ad-overlay-container, ytd-banner-promo-renderer, ytd-popup-container:has(yt-upsell-dialog-renderer)');
+                promoOverlays.forEach(el => el.remove());
+
             } catch(e) {}
-        }, 400);
+        }
+
+        // Hook MutationObserver for instantaneous 0-millisecond reaction
+        const targetNode = document.documentElement || document.body;
+        const observer = new MutationObserver(() => {
+            processAdBlocker();
+        });
+        observer.observe(targetNode, {
+            attributes: true,
+            attributeFilter: ['class', 'style'],
+            childList: true,
+            subtree: true
+        });
+
+        // Backup high-frequency interval to catch stream changes reliably
+        setInterval(processAdBlocker, 80);
+
+        // Keep active across Single Page Application (SPA) YouTube video navigations
+        window.addEventListener('yt-navigate-finish', () => {
+            isAdActive = false;
+            processAdBlocker();
+        });
 
     } catch(err) {
         console.error('Antigravity Cinema Init Error:', err);
@@ -461,10 +799,11 @@ CINEMA_JS = r"""
 """
 
 def on_loaded(window):
-    """Inject cinema styling, view switcher, download button, and ad-stripper once YouTube page finishes loading"""
+    """Inject permanent adblock CSS shield, cinema styling, view switcher, and stealth ad-blocker engine"""
+    adblock_css_sanitized = ADBLOCK_CSS.replace("`", "\\`").replace("\n", " ")
     cinema_css_sanitized = CINEMA_CSS.replace("`", "\\`").replace("\n", " ")
     controls_css_sanitized = CONTROLS_CSS.replace("`", "\\`").replace("\n", " ")
-    js_payload = CINEMA_JS.replace("{cinema_css}", cinema_css_sanitized).replace("{controls_css}", controls_css_sanitized)
+    js_payload = CINEMA_JS.replace("{adblock_css}", adblock_css_sanitized).replace("{cinema_css}", cinema_css_sanitized).replace("{controls_css}", controls_css_sanitized)
     window.evaluate_js(js_payload)
 
 def main():
