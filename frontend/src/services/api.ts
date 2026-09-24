@@ -91,6 +91,7 @@ export const api = {
       added_count: number;
       duplicate_count: number;
       items: DownloadItem[];
+      error?: string;
     }>("/downloads/add", {
       method: "POST",
       body: JSON.stringify(payload),

@@ -1,105 +1,85 @@
 import React from "react";
-import { Play, Pause, Trash2, CheckCircle2, Clock, Activity, Radio } from "lucide-react";
+import { Play, Pause, Trash2, CheckCircle2, Clock, Radio, AlertCircle } from "lucide-react";
 import { useQueueStore } from "../../stores/useQueueStore";
-import { Button } from "../ui/Button";
+import { GlassSurface } from "../ui/GlassSurface";
 
 export const QueueSummary: React.FC = () => {
   const { summary, pauseAll, resumeAll, clearCompleted } = useQueueStore();
 
   return (
-    <div className="w-full bg-surface border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-      {/* Metrics Row */}
-      <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
-        <div>
-          <span className="block text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">
-            Total Queue
+    <GlassSurface
+      variant="panel"
+      className="p-3.5 px-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-glass-sm"
+    >
+      {/* Compact Contextual Status Indicators */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs">
+        <span className="font-semibold text-foreground-muted mr-1">Queue:</span>
+
+        {summary.active > 0 && (
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-accent-cyan/15 text-accent-cyan font-bold border border-accent-cyan/25 animate-pulse">
+            <Radio className="w-3 h-3" />
+            <span>{summary.active} Downloading</span>
           </span>
-          <span className="text-xl font-bold text-foreground tracking-tight">
-            {summary.total}
+        )}
+
+        {summary.queued > 0 && (
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-warning/10 text-warning font-semibold border border-warning/20">
+            <Clock className="w-3 h-3" />
+            <span>{summary.queued} Queued</span>
           </span>
-        </div>
+        )}
 
-        <div className="h-8 w-[1px] bg-border/60 hidden sm:block" />
+        {summary.completed > 0 && (
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-success/10 text-success font-semibold border border-success/20">
+            <CheckCircle2 className="w-3 h-3" />
+            <span>{summary.completed} Completed</span>
+          </span>
+        )}
 
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-          <div>
-            <span className="block text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">
-              Active
-            </span>
-            <span className="text-xl font-bold text-accent-cyan tracking-tight">
-              {summary.active}
-            </span>
-          </div>
-        </div>
+        {summary.failed > 0 && (
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-danger/10 text-danger font-semibold border border-danger/20">
+            <AlertCircle className="w-3 h-3" />
+            <span>{summary.failed} Failed</span>
+          </span>
+        )}
 
-        <div className="h-8 w-[1px] bg-border/60 hidden sm:block" />
-
-        <div className="flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5 text-warning" />
-          <div>
-            <span className="block text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">
-              Queued
-            </span>
-            <span className="text-xl font-bold text-warning tracking-tight">
-              {summary.queued}
-            </span>
-          </div>
-        </div>
-
-        <div className="h-8 w-[1px] bg-border/60 hidden sm:block" />
-
-        <div className="flex items-center gap-1.5">
-          <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-          <div>
-            <span className="block text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">
-              Completed
-            </span>
-            <span className="text-xl font-bold text-success tracking-tight">
-              {summary.completed}
-            </span>
-          </div>
-        </div>
+        {summary.total === 0 && (
+          <span className="text-foreground-subtle text-xs">No active items</span>
+        )}
       </div>
 
       {/* Bulk Control Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         {summary.active > 0 && (
-          <Button
-            size="sm"
-            variant="secondary"
+          <button
             onClick={pauseAll}
-            className="text-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-card hover:bg-surface-elevated text-xs font-semibold text-foreground-muted hover:text-foreground transition-colors"
           >
-            <Pause className="w-3.5 h-3.5 mr-1" />
+            <Pause className="w-3.5 h-3.5" />
             <span>Pause All</span>
-          </Button>
+          </button>
         )}
 
         {summary.paused > 0 && (
-          <Button
-            size="sm"
-            variant="secondary"
+          <button
             onClick={resumeAll}
-            className="text-xs text-accent-cyan"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/15 hover:bg-primary/25 border border-primary/30 text-xs font-semibold text-primary transition-colors"
           >
-            <Play className="w-3.5 h-3.5 mr-1 fill-accent-cyan" />
+            <Play className="w-3.5 h-3.5 fill-primary" />
             <span>Resume All</span>
-          </Button>
+          </button>
         )}
 
         {summary.completed > 0 && (
-          <Button
-            size="sm"
-            variant="ghost"
+          <button
             onClick={clearCompleted}
-            className="text-xs text-foreground-muted hover:text-foreground"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-surface-elevated text-xs font-semibold text-foreground-subtle hover:text-foreground transition-colors"
           >
-            <Trash2 className="w-3.5 h-3.5 mr-1 text-foreground-subtle" />
+            <Trash2 className="w-3.5 h-3.5" />
             <span>Clear Completed</span>
-          </Button>
+          </button>
         )}
       </div>
-    </div>
+    </GlassSurface>
   );
 };

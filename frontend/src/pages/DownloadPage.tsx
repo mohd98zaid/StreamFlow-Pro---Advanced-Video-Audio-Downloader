@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Download, CheckCircle2 } from "lucide-react";
+import { Download, CheckCircle2, Sparkles, ArrowRight, AlertCircle } from "lucide-react";
 import { UrlHeroInput } from "../components/downloads/UrlHeroInput";
 import { MetadataCard } from "../components/downloads/MetadataCard";
 import { FormatOptions } from "../components/downloads/FormatOptions";
 import { useDownloadStore } from "../stores/useDownloadStore";
 import { useSettingsStore } from "../stores/useSettingsStore";
 import { useQueueStore } from "../stores/useQueueStore";
+import { useToastStore } from "../stores/useToastStore";
 import { api } from "../services/api";
 
 interface DownloadPageProps {
@@ -21,18 +22,22 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onGoToQueue }) => {
     embedThumbnail,
     embedMetadata,
     embedSubtitles,
+    isExtracting,
     resetInput,
   } = useDownloadStore();
 
   const { config } = useSettingsStore();
   const { fetchQueue } = useQueueStore();
+  const toast = useToastStore();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [downloadState, setDownloadState] = useState<"idle" | "success" | "error">("idle");
 
   const handleStartDownload = async () => {
     if (detectedUrls.length === 0) return;
 
     setIsSubmitting(true);
+    setDownloadState("idle");
     try {
       const res = await api.addDownloads({
         urls: detectedUrls,
@@ -48,50 +53,43 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onGoToQueue }) => {
       });
 
       if (res.success) {
-        setSuccessToast(
-          `Added ${res.added_count} item${res.added_count > 1 ? "s" : ""} to download queue!`
+        setDownloadState("success");
+        const count = res.added_count || detectedUrls.length;
+        toast.success(
+          `Successfully queued ${count} item${count > 1 ? "s" : ""} for download!`,
+          "Downloads Queued"
         );
         resetInput();
         fetchQueue();
-        setTimeout(() => setSuccessToast(null), 4000);
+        setTimeout(() => setDownloadState("idle"), 3000);
+      } else {
+        setDownloadState("error");
+        toast.error(res.error || "Failed to add items to queue", "Queue Error");
       }
     } catch (err: any) {
-      alert(`Download Error: ${err.message || "Failed to start download"}`);
+      setDownloadState("error");
+      toast.error(err.message || "Could not connect to download engine", "Engine Error");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const isIdle = !isSubmitting && !isExtracting && downloadState === "idle";
+
   return (
-    <div className="w-full h-full overflow-y-auto p-6 space-y-6 max-w-4xl mx-auto animate-fade-in">
+    <div className="w-full h-full overflow-y-auto p-6 space-y-6 max-w-4xl mx-auto animate-fade-in select-none">
       {/* Hero Header */}
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
           <span>Download Media</span>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-            Fast & High Quality
+          <span className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 uppercase">
+            Ultra-HD & Lossless
           </span>
         </h1>
         <p className="text-xs text-foreground-muted">
-          Download high-resolution video up to 4K, extract pristine 320kbps audio, or archive entire playlists.
+          Download high-resolution video up to 4K, extract pristine 320kbps audio, or batch archive full playlists.
         </p>
       </div>
-
-      {/* Success Notification Banner */}
-      {successToast && (
-        <div className="w-full p-3 bg-success/10 border border-success/30 rounded-xl text-xs text-success font-semibold flex items-center justify-between animate-fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>{successToast}</span>
-          </div>
-          <button
-            onClick={onGoToQueue}
-            className="underline hover:text-white font-bold transition-colors"
-          >
-            View in Queue →
-          </button>
-        </div>
-      )}
 
       {/* 1. Primary Dominant URL Input Hero */}
       <UrlHeroInput />
@@ -102,17 +100,32 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onGoToQueue }) => {
       {/* 3. Format, Quality, and Preset Options */}
       <FormatOptions />
 
-      {/* 4. Primary Download CTA Button */}
+      {/* 4. Primary Download CTA Button with Animated States */}
       <div className="pt-2">
         <button
           onClick={handleStartDownload}
-          disabled={detectedUrls.length === 0 || isSubmitting}
-          className="w-full h-12 rounded-xl bg-primary text-white font-bold text-sm tracking-wide hover:bg-primary-hover shadow-md hover:shadow-lg disabled:opacity-40 disabled:pointer-events-none transition-all duration-150 flex items-center justify-center gap-2 select-none active:scale-[0.99]"
+          disabled={detectedUrls.length === 0 || isSubmitting || isExtracting}
+          className="w-full h-13 rounded-2xl bg-gradient-to-r from-primary to-primary-hover text-white font-bold text-sm tracking-wide shadow-glass hover:shadow-lg hover:brightness-105 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 flex items-center justify-center gap-2 select-none active:scale-[0.99] border border-white/15"
         >
-          {isSubmitting ? (
+          {isExtracting ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span>Analyzing Media Stream…</span>
+            </>
+          ) : isSubmitting ? (
             <>
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               <span>Adding to Queue…</span>
+            </>
+          ) : downloadState === "success" ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-white" />
+              <span>Added to Queue!</span>
+            </>
+          ) : downloadState === "error" ? (
+            <>
+              <AlertCircle className="w-4 h-4 text-white" />
+              <span>Try Again</span>
             </>
           ) : (
             <>

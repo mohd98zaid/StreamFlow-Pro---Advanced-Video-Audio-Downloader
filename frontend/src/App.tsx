@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Titlebar } from "./components/layout/Titlebar";
 import { Sidebar, NavTab } from "./components/layout/Sidebar";
-import { StatusFooter } from "./components/layout/StatusFooter";
+import { MiniPlayer } from "./components/media/MiniPlayer";
+import { ToastContainer } from "./components/ui/ToastContainer";
 import { DownloadPage } from "./pages/DownloadPage";
 import { DownloadsPage } from "./pages/DownloadsPage";
 import { HistoryPage } from "./pages/HistoryPage";
@@ -33,15 +34,18 @@ export function App() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none">
-      {/* 1. Window Titlebar with controls */}
+    <div className="flex flex-col h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none relative">
+      {/* 1. In-App Floating Toast System */}
+      <ToastContainer />
+
+      {/* 2. Window Titlebar with native controls */}
       <Titlebar />
 
-      {/* 2. Middle: Sidebar + Main Content View */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* 3. Middle Workstation: Sidebar + Main Content View */}
+      <div className="flex flex-1 overflow-hidden relative">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <main className="flex-1 overflow-hidden relative bg-background/50">
+        <main className="flex-1 overflow-hidden relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-surface-elevated/25 via-background to-background">
           {activeTab === "download" && (
             <DownloadPage onGoToQueue={() => setActiveTab("queue")} />
           )}
@@ -56,8 +60,8 @@ export function App() {
         </main>
       </div>
 
-      {/* 3. Bottom Status Footer */}
-      <StatusFooter />
+      {/* 4. Bottom YDS MiniPlayer & Media Telemetry Bar */}
+      <MiniPlayer />
     </div>
   );
 }
