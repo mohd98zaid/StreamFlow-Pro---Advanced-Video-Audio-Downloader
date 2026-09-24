@@ -87,6 +87,19 @@ class TestDownloadQueue(unittest.TestCase):
         
         next_item = queue.get_next()
         self.assertEqual(next_item, item1)
+        self.assertEqual(item1.status, "Downloading")
+        # Calling get_next again must return None since item1 is now Downloading and item2 is paused
+        self.assertIsNone(queue.get_next())
+
+    def test_duplicate_prevention(self):
+        """Test that duplicate active URLs cannot be added simultaneously"""
+        queue = DownloadQueue()
+        item1 = DownloadItem("https://test.com/v1", "video", "1080p", {}, "template")
+        item2 = DownloadItem("https://test.com/v1", "video", "1080p", {}, "template")
+        
+        self.assertTrue(queue.add(item1))
+        self.assertFalse(queue.add(item2))
+        self.assertEqual(len(queue.items), 1)
 
 
 class TestDownloadStats(unittest.TestCase):

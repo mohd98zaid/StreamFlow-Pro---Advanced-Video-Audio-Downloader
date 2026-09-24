@@ -115,10 +115,18 @@ class DownloadQueue:
         self.history: List[DownloadItem] = []
         self.lock = threading.Lock()
     
-    def add(self, item: DownloadItem) -> None:
-        """Add item to queue"""
+    def add(self, item: DownloadItem) -> bool:
+        """Add item to queue if not already queued or downloading"""
         with self.lock:
+            for existing in self.items:
+                if existing.url == item.url and existing.status in [
+                    DownloadStatus.QUEUED.value,
+                    DownloadStatus.DOWNLOADING.value,
+                    DownloadStatus.PROCESSING.value
+                ] and not existing.cancelled:
+                    return False
             self.items.append(item)
+            return True
     
     def remove(self, item: DownloadItem) -> None:
         """Remove item from queue"""
@@ -127,10 +135,11 @@ class DownloadQueue:
                 self.items.remove(item)
     
     def get_next(self) -> Optional[DownloadItem]:
-        """Get next queued item that's not paused or cancelled"""
+        """Get next queued item that's not paused or cancelled, atomically marking it as downloading"""
         with self.lock:
             for item in self.items:
                 if item.status == DownloadStatus.QUEUED.value and not item.paused and not item.cancelled:
+                    item.status = DownloadStatus.DOWNLOADING.value
                     return item
         return None
     

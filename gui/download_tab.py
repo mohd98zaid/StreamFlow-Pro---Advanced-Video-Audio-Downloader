@@ -488,16 +488,20 @@ class DownloadTab:
         if not selected:
             return
         
+        added_count = 0
         for iid in selected:
             vals = self.results_tree.item(iid)['values']
             url = vals[4]
             title = vals[0]
             item = self.create_download_item(url, title)
-            self.downloader.download_queue.add(item)
-            self.log(f"Added: {title}")
+            if self.downloader.download_queue.add(item):
+                added_count += 1
+                self.log(f"Added: {title}")
+            else:
+                self.log(f"⚠️ Already in queue: {title}")
         
         self.event_bus.emit(Event.QUEUE_UPDATED, None)
-        self.log(f"✅ Added {len(selected)} item(s) to queue")
+        self.log(f"✅ Added {added_count} item(s) to queue")
     
     def download_selected_now(self) -> None:
         """Download selected search results immediately"""
@@ -555,13 +559,20 @@ class DownloadTab:
                 else:
                     items_to_queue.append(item)
             
+            added_count = 0
             for qitem in items_to_queue:
-                self.downloader.download_queue.add(qitem)
+                if self.downloader.download_queue.add(qitem):
+                    added_count += 1
+                else:
+                    self.frame.after(0, lambda u=qitem.url: self.log(f"⚠️ Already in download queue: {u}"))
             
             def finalize_ui():
                 self.event_bus.emit(Event.QUEUE_UPDATED, None)
                 self.downloader.start_queue_processor()
-                self.log(f"🚀 Added {len(items_to_queue)} item(s) to queue and started engine.")
+                if added_count > 0:
+                    self.log(f"🚀 Added {added_count} item(s) to queue and started engine.")
+                else:
+                    self.log("⚠️ No new items added (already in queue or downloading).")
                 
             self.frame.after(0, finalize_ui)
 

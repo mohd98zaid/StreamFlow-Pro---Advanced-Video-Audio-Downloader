@@ -77,7 +77,7 @@ class Downloader:
             'postprocessor_hooks': [lambda d: self.postprocess_hook(d, item)],
             'quiet': True,
             'no_warnings': True,
-            'ignoreerrors': True,
+            'ignoreerrors': False,
             'nocheckcertificate': True,
             'retries': 10,
             'fragment_retries': 10,
@@ -101,7 +101,12 @@ class Downloader:
                 ydl_opts['postprocessors'].append({'key': 'FFmpegMetadata'})
             if item.options.get('embed_thumbnail'):
                 ydl_opts['writethumbnail'] = True
-                ydl_opts['postprocessors'].append({'key': 'EmbedThumbnailPP'})
+                ydl_opts['postprocessors'].append({
+                    'key': 'FFmpegThumbnailsConvertor',
+                    'format': 'jpg',
+                    'when': 'before_dl'
+                })
+                ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
         
         # Video downloads
         else:
@@ -136,6 +141,20 @@ class Downloader:
             
             logging.info(f"Quality: {item.quality} -> Format: {ydl_opts['format']}")
             
+            if item.options.get('embed_metadata'):
+                if 'postprocessors' not in ydl_opts:
+                    ydl_opts['postprocessors'] = []
+                ydl_opts['postprocessors'].append({'key': 'FFmpegMetadata'})
+            if item.options.get('embed_thumbnail'):
+                ydl_opts['writethumbnail'] = True
+                if 'postprocessors' not in ydl_opts:
+                    ydl_opts['postprocessors'] = []
+                ydl_opts['postprocessors'].append({
+                    'key': 'FFmpegThumbnailsConvertor',
+                    'format': 'jpg',
+                    'when': 'before_dl'
+                })
+                ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
             if item.options.get('embed_subtitles'):
                 ydl_opts['writesubtitles'] = True
                 ydl_opts['subtitleslangs'] = ['en']
@@ -356,9 +375,23 @@ class Downloader:
                     self.event_bus.emit(Event.QUEUE_UPDATED, None)
                     return
                 
-                ydl.download([item.url])
+                retcode = ydl.download([item.url])
+                if retcode != 0:
+                    raise yt_dlp.DownloadError(f"Download failed with exit code {retcode}")
             
             if not item.cancelled and not item.paused:
+                # Verify downloaded file actually exists on disk
+                if item.file_path and not os.path.exists(item.file_path):
+                    base, _ = os.path.splitext(item.file_path)
+                    found = False
+                    for ext in ['.mp4', '.mkv', '.webm', '.mp3', '.m4a', '.wav']:
+                        if os.path.exists(base + ext):
+                            item.file_path = base + ext
+                            found = True
+                            break
+                    if not found:
+                        raise yt_dlp.DownloadError(f"Target file not found after download: {item.file_path}")
+                
                 item.status = DownloadStatus.COMPLETED.value
                 item.progress = 100
                 self.log(f"[OK] Completed: {item.title}")
@@ -403,6 +436,8 @@ class Downloader:
             return
         
         item.error = error_msg
+        item.speed = "Error"
+        item.eta = "N/A"
         if item.retry_count < item.max_retries:
             item.retry_count += 1
             item.status = f"Retry {item.retry_count}/{item.max_retries}"
@@ -449,10 +484,10 @@ class Downloader:
                 if req.get('title'):
                     item.title = req['title']
                 
-                self.download_queue.add(item)
-                self.database.add_download(item)
-                self.log(f"📥 Added from Player to Queue: {item.title or item.url}")
-                self.event_bus.emit(Event.QUEUE_UPDATED, None)
+                if self.download_queue.add(item):
+                    self.database.add_download(item)
+                    self.log(f"📥 Added from Player to Queue: {item.title or item.url}")
+                    self.event_bus.emit(Event.QUEUE_UPDATED, None)
                 
         except Exception as e:
             logging.error(f"Error checking inbox queue: {e}")
@@ -473,6 +508,8 @@ class Downloader:
                     while active_count < self.max_concurrent:
                         item = self.download_queue.get_next()
                         if item:
+                            with self.active_downloads_lock:
+                                self.active_downloads[item.id] = item
                             # Submit to thread pool
                             self.executor.submit(self.download_item, item)
                             active_count += 1

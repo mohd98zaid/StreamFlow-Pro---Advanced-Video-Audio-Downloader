@@ -7,9 +7,9 @@ from typing import Optional
 try:
     from win10toast import ToastNotifier
     NOTIFICATIONS_AVAILABLE = True
-except ImportError:
+except (ImportError, Exception):
     NOTIFICATIONS_AVAILABLE = False
-    logging.warning("win10toast not available - notifications disabled")
+    logging.debug("win10toast not available - notifications disabled")
 
 
 class NotificationManager:

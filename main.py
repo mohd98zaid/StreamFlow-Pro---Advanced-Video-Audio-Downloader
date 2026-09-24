@@ -50,8 +50,8 @@ def check_dependencies():
     # Optional but recommended packages
     try:
         import win10toast
-    except ImportError:
-        logging.warning("win10toast not found - notifications will be disabled")
+    except (ImportError, Exception):
+        logging.debug("win10toast not found - notifications will be disabled")
 
     if missing:
         root = tk.Tk()
