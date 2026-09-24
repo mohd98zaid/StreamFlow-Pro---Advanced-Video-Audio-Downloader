@@ -6,5 +6,7 @@ pywebview>=5.0.0
 tkinterweb>=4.25.0
 win10toast>=0.9  # Optional: Windows notifications
 pillow>=10.0.0
+fastapi>=0.110.0
+uvicorn>=0.28.0
 
 
