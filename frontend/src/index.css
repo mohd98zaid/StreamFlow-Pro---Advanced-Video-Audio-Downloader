@@ -82,24 +82,106 @@
 /* Glass Surface Utilities for YDS (Yuma Design System) */
 .glass-panel {
   background-color: var(--surface-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-glass);
 }
 
 .glass-card {
   background-color: var(--surface-glass-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border-glass);
 }
 
 .glass-pill {
   background-color: var(--surface-glass);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border-glass);
   border-radius: 9999px;
+}
+
+/* Ambient Radial Glow Background Utilities */
+.ambient-glow-top {
+  position: absolute;
+  top: -120px;
+  left: 20%;
+  width: 500px;
+  height: 380px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+  border-radius: 9999px;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ambient-glow-bottom {
+  position: absolute;
+  bottom: 40px;
+  right: 15%;
+  width: 450px;
+  height: 340px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.10) 0%, transparent 70%);
+  border-radius: 9999px;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Shimmer Loading Effect */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: shimmer 1.8s infinite;
+}
+
+/* Custom modern toggle switch */
+.switch-root {
+  width: 42px;
+  height: 24px;
+  border-radius: 9999px;
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-glass);
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.switch-root[data-state="checked"] {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.switch-thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  background-color: white;
+  border-radius: 9999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateX(2px);
+  margin-top: 2px;
+}
+
+.switch-root[data-state="checked"] .switch-thumb {
+  transform: translateX(20px);
 }
 
 /* Prevent text selection during desktop dragging */

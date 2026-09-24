@@ -5,10 +5,9 @@ import {
   Palette,
   Bell,
   Info,
-  CheckCircle2,
   ExternalLink,
-  HardDrive,
-  Cpu,
+  ShieldCheck,
+  Check,
 } from "lucide-react";
 import { useSettingsStore } from "../stores/useSettingsStore";
 import { useToastStore } from "../stores/useToastStore";
@@ -28,11 +27,11 @@ export const SettingsPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
             <span>Settings & Preferences</span>
           </h1>
           <p className="text-xs text-foreground-muted">
-            Configure download directories, concurrent worker threads, appearance themes, and metadata tags.
+            Configure download paths, thread parallelism, appearance themes, and metadata tags.
           </p>
         </div>
       </div>
@@ -64,7 +63,7 @@ export const SettingsPage: React.FC = () => {
                 />
                 <button
                   onClick={browseFolder}
-                  className="h-10 px-4 rounded-xl glass-card hover:bg-surface-elevated border border-border-glass text-xs font-semibold text-foreground transition-colors"
+                  className="h-10 px-4 rounded-xl glass-card hover:bg-surface-elevated border border-border-glass text-xs font-semibold text-foreground transition-colors shadow-sm"
                 >
                   Browse Folder…
                 </button>
@@ -134,15 +133,15 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">Theme & Visual Experience</h2>
-              <span className="text-[11px] text-foreground-subtle">Yuma Design System (YDS) color palette</span>
+              <span className="text-[11px] text-foreground-subtle">Yuma Design System (YDS) visual palette</span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             {[
-              { id: "dark", label: "Dark Workstation (Recommended)" },
+              { id: "dark", label: "Dark Studio (Recommended)" },
               { id: "light", label: "Neutral Light Glass" },
-              { id: "system", label: "System Windows Sync" },
+              { id: "system", label: "Windows System Sync" },
             ].map((th) => (
               <button
                 key={th.id}
@@ -152,7 +151,7 @@ export const SettingsPage: React.FC = () => {
                 }}
                 className={`flex-1 py-3 px-3 rounded-2xl border text-xs font-semibold transition-all ${
                   theme === th.id
-                    ? "bg-primary text-white border-primary shadow-sm font-bold"
+                    ? "bg-primary text-white border-primary shadow-glow-primary font-bold"
                     : "glass-card text-foreground-muted hover:text-foreground"
                 }`}
               >
@@ -162,7 +161,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         </GlassSurface>
 
-        {/* Section 4: Notifications & Metadata */}
+        {/* Section 4: Notifications & Metadata (with tactile modern toggle switches) */}
         <GlassSurface variant="panel" className="p-5 space-y-4">
           <div className="flex items-center gap-2.5 pb-2.5 border-b border-border-hairline">
             <div className="w-7 h-7 rounded-xl bg-accent-cyan/10 flex items-center justify-center text-accent-cyan">
@@ -170,13 +169,14 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">Notifications & Tag Embedding</h2>
-              <span className="text-[11px] text-foreground-subtle">Configure automatic post-processing</span>
+              <span className="text-[11px] text-foreground-subtle">Automated post-processing and system banners</span>
             </div>
           </div>
 
           <div className="space-y-3">
-            <label className="flex items-center justify-between p-3 rounded-2xl hover:bg-surface-elevated/60 cursor-pointer select-none border border-border-hairline transition-colors">
-              <div>
+            {/* Toggle 1 */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-surface-elevated/60 transition-colors border border-border-hairline">
+              <div className="space-y-0.5 pr-4">
                 <span className="block text-xs font-semibold text-foreground">
                   Windows Desktop Toast Notifications
                 </span>
@@ -184,16 +184,21 @@ export const SettingsPage: React.FC = () => {
                   Receive Windows notification when downloads complete or fail in the background.
                 </span>
               </div>
-              <input
-                type="checkbox"
-                checked={config.notifications_enabled ?? true}
-                onChange={(e) => handleUpdate({ notifications_enabled: e.target.checked })}
-                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-border-glass cursor-pointer"
-              />
-            </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={config.notifications_enabled ?? true}
+                data-state={(config.notifications_enabled ?? true) ? "checked" : "unchecked"}
+                onClick={() => handleUpdate({ notifications_enabled: !(config.notifications_enabled ?? true) })}
+                className="switch-root flex-shrink-0"
+              >
+                <span className="switch-thumb" />
+              </button>
+            </div>
 
-            <label className="flex items-center justify-between p-3 rounded-2xl hover:bg-surface-elevated/60 cursor-pointer select-none border border-border-hairline transition-colors">
-              <div>
+            {/* Toggle 2 */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-surface-elevated/60 transition-colors border border-border-hairline">
+              <div className="space-y-0.5 pr-4">
                 <span className="block text-xs font-semibold text-foreground">
                   Always Embed Thumbnail Artwork
                 </span>
@@ -201,16 +206,21 @@ export const SettingsPage: React.FC = () => {
                   Embeds cover art directly into audio and video files using FFmpeg.
                 </span>
               </div>
-              <input
-                type="checkbox"
-                checked={config.embed_thumbnail ?? true}
-                onChange={(e) => handleUpdate({ embed_thumbnail: e.target.checked })}
-                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-border-glass cursor-pointer"
-              />
-            </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={config.embed_thumbnail ?? true}
+                data-state={(config.embed_thumbnail ?? true) ? "checked" : "unchecked"}
+                onClick={() => handleUpdate({ embed_thumbnail: !(config.embed_thumbnail ?? true) })}
+                className="switch-root flex-shrink-0"
+              >
+                <span className="switch-thumb" />
+              </button>
+            </div>
 
-            <label className="flex items-center justify-between p-3 rounded-2xl hover:bg-surface-elevated/60 cursor-pointer select-none border border-border-hairline transition-colors">
-              <div>
+            {/* Toggle 3 */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-surface-elevated/60 transition-colors border border-border-hairline">
+              <div className="space-y-0.5 pr-4">
                 <span className="block text-xs font-semibold text-foreground">
                   Always Embed Metadata Tags
                 </span>
@@ -218,13 +228,17 @@ export const SettingsPage: React.FC = () => {
                   Embeds artist name, release year, album, and track title into ID3/MP4 tags.
                 </span>
               </div>
-              <input
-                type="checkbox"
-                checked={config.embed_metadata ?? true}
-                onChange={(e) => handleUpdate({ embed_metadata: e.target.checked })}
-                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-border-glass cursor-pointer"
-              />
-            </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={config.embed_metadata ?? true}
+                data-state={(config.embed_metadata ?? true) ? "checked" : "unchecked"}
+                onClick={() => handleUpdate({ embed_metadata: !(config.embed_metadata ?? true) })}
+                className="switch-root flex-shrink-0"
+              >
+                <span className="switch-thumb" />
+              </button>
+            </div>
           </div>
         </GlassSurface>
 
@@ -253,7 +267,7 @@ export const SettingsPage: React.FC = () => {
                 href="https://github.com/mohd98zaid/StreamFlow-Pro---Advanced-Video-Audio-Downloader"
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-card text-foreground hover:text-primary transition-colors text-xs font-semibold"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-card text-foreground hover:text-primary transition-colors text-xs font-semibold shadow-sm"
               >
                 <span>GitHub Repository</span>
                 <ExternalLink className="w-3 h-3 text-foreground-subtle ml-0.5" />

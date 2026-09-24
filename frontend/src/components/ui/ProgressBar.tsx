@@ -26,15 +26,15 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   return (
     <div
       className={cn(
-        "h-1.5 w-full bg-border/40 rounded-full overflow-hidden relative",
+        "h-1.5 w-full bg-surface-elevated/80 border border-border-hairline rounded-full overflow-hidden relative shadow-inner",
         className
       )}
     >
       <div
         className={cn(
-          "h-full rounded-full transition-all duration-200 ease-out",
+          "h-full rounded-full transition-all duration-200 ease-out relative overflow-hidden",
           variants[variant],
-          animated && "animate-pulse"
+          animated && "animate-shimmer"
         )}
         style={{ width: `${clamped}%` }}
       />

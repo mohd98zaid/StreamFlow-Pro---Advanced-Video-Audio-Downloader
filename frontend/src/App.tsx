@@ -45,18 +45,24 @@ export function App() {
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <main className="flex-1 overflow-hidden relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-surface-elevated/25 via-background to-background">
-          {activeTab === "download" && (
-            <DownloadPage onGoToQueue={() => setActiveTab("queue")} />
-          )}
-          {activeTab === "queue" && (
-            <DownloadsPage onNewDownload={() => setActiveTab("download")} />
-          )}
-          {activeTab === "history" && <HistoryPage />}
-          {activeTab === "search" && (
-            <SearchPage onGoToQueue={() => setActiveTab("queue")} />
-          )}
-          {activeTab === "settings" && <SettingsPage />}
+        <main className="flex-1 overflow-hidden relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-surface-elevated/20 via-background to-background">
+          {/* Ambient Studio Lighting Orbs */}
+          <div className="ambient-glow-top" />
+          <div className="ambient-glow-bottom" />
+
+          <div className="w-full h-full relative z-10">
+            {activeTab === "download" && (
+              <DownloadPage onGoToQueue={() => setActiveTab("queue")} />
+            )}
+            {activeTab === "queue" && (
+              <DownloadsPage onNewDownload={() => setActiveTab("download")} />
+            )}
+            {activeTab === "history" && <HistoryPage />}
+            {activeTab === "search" && (
+              <SearchPage onGoToQueue={() => setActiveTab("queue")} />
+            )}
+            {activeTab === "settings" && <SettingsPage />}
+          </div>
         </main>
       </div>
 

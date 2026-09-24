@@ -61,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         <div>
           <button
             onClick={() => onTabChange("download")}
-            className="w-full flex items-center justify-center gap-2 h-10 px-4 rounded-2xl bg-gradient-to-r from-primary to-primary-hover text-white font-semibold text-xs tracking-wide shadow-glass-sm hover:shadow-glass hover:brightness-105 transition-all duration-150 active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 h-10 px-4 rounded-2xl bg-gradient-to-r from-primary via-indigo-500 to-primary-hover text-white font-bold text-xs tracking-wide shadow-glow-primary hover:shadow-lg hover:brightness-110 transition-all duration-200 active:scale-[0.98] border border-white/20"
           >
             <DownloadCloud className="w-4 h-4" />
             <span>+ New Download</span>
@@ -78,9 +78,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 group relative",
+                  "w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group relative select-none",
                   isActive
-                    ? "bg-surface-elevated/90 text-primary border border-border-glass shadow-sm font-bold"
+                    ? "bg-surface-elevated/90 text-primary border border-border-glass shadow-sm font-bold before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:bg-primary before:rounded-r-full"
                     : "text-foreground-muted hover:text-foreground hover:bg-surface-elevated/50"
                 )}
               >
@@ -97,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                 {item.badge !== undefined && (
                   <span
                     className={cn(
-                      "px-1.5 py-0.2 rounded-full text-[10px] font-bold min-w-[18px] text-center shadow-sm",
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center shadow-sm",
                       item.badgeColor
                     )}
                   >

@@ -40,21 +40,24 @@ export default {
       },
       fontFamily: {
         sans: [
+          'Plus Jakarta Sans',
+          'Inter',
+          '-apple-system',
+          'BlinkMacSystemFont',
           'Segoe UI Variable Text',
           'Segoe UI',
           'system-ui',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'Plus Jakarta Sans',
           'Roboto',
           'sans-serif'
         ],
-        mono: ['Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
+        mono: ['JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', 'monospace'],
       },
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.36)',
         'glass-sm': '0 4px 16px 0 rgba(0, 0, 0, 0.24)',
         'artwork': '0 12px 28px -6px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)',
+        'glow-primary': '0 0 28px -4px rgba(99, 102, 241, 0.4)',
+        'glow-cyan': '0 0 28px -4px rgba(56, 189, 248, 0.4)',
       },
       animation: {
         'pulse-subtle': 'pulseSubtle 2.5s ease-in-out infinite',
