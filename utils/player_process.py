@@ -605,28 +605,80 @@ html, body {
 """
 
 CONTROLS_CSS = """
-/* Top control pill */
+/* StreamFlow Floating Control Dock - Placed bottom-right so YouTube search bar is never obstructed */
 #antigravity-top-controls {
     position: fixed;
-    top: 14px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 24px;
+    right: 24px;
+    top: auto;
+    left: auto;
+    transform: none;
     z-index: 2147483647;
-    pointer-events: none;
+    pointer-events: auto;
     display: flex;
     align-items: center;
     gap: 8px;
     opacity: 1;
-    transition: opacity 0.4s ease, transform 0.3s ease;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     max-width: 96vw;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-end;
+    background: rgba(15, 23, 42, 0.85);
+    padding: 6px 10px;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    cursor: default;
+}
+
+/* In Cinema Mode (YouTube header hidden, player fills screen), float top center */
+body.ag-cinema-active #antigravity-top-controls {
+    bottom: auto;
+    right: auto;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.70);
+}
+
+/* On YouTube Music, float right just above the bottom player bar */
+body.ag-music-site #antigravity-top-controls {
+    bottom: 84px;
+    right: 24px;
 }
 
 #antigravity-top-controls.hidden {
     opacity: 0 !important;
     pointer-events: none !important;
-    transform: translateX(-50%) translateY(-6px);
+    transform: translateY(12px);
+}
+
+body.ag-cinema-active #antigravity-top-controls.hidden {
+    transform: translateX(-50%) translateY(-12px);
+}
+
+/* Collapsed Dock State */
+#antigravity-top-controls.ag-dock-collapsed {
+    padding: 4px 6px;
+    border-radius: 20px;
+}
+
+#antigravity-top-controls.ag-dock-collapsed .ag-control-btn:not(.ag-toggle-btn) {
+    display: none !important;
+}
+
+.ag-toggle-btn {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+}
+
+.ag-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
 }
 
 .ag-control-btn {
@@ -1832,6 +1884,25 @@ CINEMA_JS = r"""
             dlBtn.textContent = isMusicSite ? '🎵 Download MP3' : '⬇️ Download Video';
             dlBtn.title = isMusicSite ? 'Download 320kbps MP3 audio' : 'Download current video';
 
+            // Minimize / Collapse Button
+            const minBtn = document.createElement('button');
+            minBtn.className = 'ag-control-btn ag-toggle-btn';
+            minBtn.id = 'agMinBtn';
+            minBtn.textContent = '—';
+            minBtn.title = 'Minimize StreamFlow controls';
+            minBtn.onclick = (e) => {
+                e.stopPropagation();
+                controls.classList.toggle('ag-dock-collapsed');
+                if (controls.classList.contains('ag-dock-collapsed')) {
+                    minBtn.textContent = '⚡ StreamFlow';
+                    minBtn.title = 'Expand StreamFlow controls';
+                } else {
+                    minBtn.textContent = '—';
+                    minBtn.title = 'Minimize StreamFlow controls';
+                }
+            };
+
+            controls.appendChild(minBtn);
             controls.appendChild(fsBtn);
             controls.appendChild(studioBtn);
             controls.appendChild(musicBtn);
@@ -1853,6 +1924,8 @@ CINEMA_JS = r"""
         const dlBtn = document.getElementById('agDlBtn');
 
         if (isMusicSite) {
+            document.body.classList.add('ag-music-site');
+            document.body.classList.remove('ag-cinema-active');
             if (cinemaStyle) cinemaStyle.disabled = true;
             if (modeBtn) modeBtn.style.display = 'none';
             if (musicBtn) {
@@ -1864,6 +1937,8 @@ CINEMA_JS = r"""
                 dlBtn.title = 'Download 320kbps MP3 audio';
             }
         } else {
+            document.body.classList.remove('ag-music-site');
+            document.body.classList.toggle('ag-cinema-active', isCinema);
             if (!isCinema && cinemaStyle) {
                 cinemaStyle.disabled = true;
                 if (modeBtn) {
@@ -1921,6 +1996,7 @@ CINEMA_JS = r"""
         if (modeBtn) {
             modeBtn.onclick = () => {
                 isCinema = !isCinema;
+                document.body.classList.toggle('ag-cinema-active', isCinema);
                 if (isCinema) {
                     cinemaStyle.disabled = false;
                     modeBtn.textContent = '🌐 YouTube View';
@@ -2142,6 +2218,59 @@ CINEMA_JS = r"""
         window.addEventListener('mousemove', resetTimer);
         window.addEventListener('mousedown', resetTimer);
         resetTimer();
+
+        // Auto-fade dock when user focuses YouTube search bar so it never obstructs typing or autocomplete
+        document.addEventListener('focusin', (e) => {
+            if (e.target && (e.target.matches('input#search') || e.target.matches('input[name="search_query"]') || e.target.closest('ytd-searchbox, ytmusic-search-box'))) {
+                if (!document.body.classList.contains('ag-cinema-active')) {
+                    controls.classList.add('hidden');
+                }
+            }
+        }, true);
+        document.addEventListener('focusout', (e) => {
+            if (e.target && (e.target.matches('input#search') || e.target.matches('input[name="search_query"]') || e.target.closest('ytd-searchbox, ytmusic-search-box'))) {
+                resetTimer();
+            }
+        }, true);
+
+        // Lightweight Draggable Support for Floating Controls Dock
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let initialLeft = 0, initialTop = 0;
+
+        controls.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('button')) return;
+            isDragging = true;
+            const rect = controls.getBoundingClientRect();
+            startX = e.clientX;
+            startY = e.clientY;
+            initialLeft = rect.left;
+            initialTop = rect.top;
+            try { controls.setPointerCapture(e.pointerId); } catch(err) {}
+            e.preventDefault();
+        });
+
+        controls.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            const newLeft = Math.max(10, Math.min(window.innerWidth - controls.offsetWidth - 10, initialLeft + dx));
+            const newTop = Math.max(10, Math.min(window.innerHeight - controls.offsetHeight - 10, initialTop + dy));
+            controls.style.left = newLeft + 'px';
+            controls.style.top = newTop + 'px';
+            controls.style.bottom = 'auto';
+            controls.style.right = 'auto';
+            controls.style.transform = 'none';
+        });
+
+        const stopDrag = (e) => {
+            if (isDragging) {
+                isDragging = false;
+                try { controls.releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+        };
+        controls.addEventListener('pointerup', stopDrag);
+        controls.addEventListener('pointercancel', stopDrag);
 
         // =========================================================================
         // =========================================================================
