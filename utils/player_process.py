@@ -593,7 +593,7 @@ html, body {
 """
 
 CONTROLS_CSS = """
-/* StreamFlow Floating Control Dock - Placed bottom-right so YouTube search bar is never obstructed */
+/* StreamFlow Floating Control Dock - Collapsed by default into sleek pill, expands smoothly on hover */
 #antigravity-top-controls {
     position: fixed;
     bottom: 24px;
@@ -603,22 +603,33 @@ CONTROLS_CSS = """
     transform: none;
     z-index: 2147483647;
     pointer-events: auto;
-    display: flex;
+    display: inline-flex;
+    flex-direction: row-reverse;
     align-items: center;
     gap: 8px;
-    opacity: 1;
-    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 0.95;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
+                transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.3s ease,
+                background 0.3s ease;
     max-width: 96vw;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    background: rgba(15, 23, 42, 0.85);
-    padding: 6px 10px;
-    border-radius: 28px;
+    background: rgba(15, 23, 42, 0.88);
+    padding: 4px 6px;
+    border-radius: 9999px;
     border: 1px solid rgba(255, 255, 255, 0.18);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
     cursor: default;
+    user-select: none;
+}
+
+#antigravity-top-controls:hover,
+#antigravity-top-controls.ag-dock-expanded {
+    opacity: 1;
+    background: rgba(15, 23, 42, 0.95);
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(245, 158, 11, 0.15);
 }
 
 /* In Cinema Mode (YouTube header hidden, player fills screen), float top center */
@@ -628,7 +639,7 @@ body.ag-cinema-active #antigravity-top-controls {
     top: 14px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(15, 23, 42, 0.70);
+    background: rgba(15, 23, 42, 0.75);
 }
 
 /* On YouTube Music, float right just above the bottom player bar */
@@ -647,26 +658,72 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
     transform: translateX(-50%) translateY(-12px);
 }
 
-/* Collapsed Dock State */
-#antigravity-top-controls.ag-dock-collapsed {
-    padding: 4px 6px;
-    border-radius: 20px;
+/* Smooth expandable actions container (collapsed by default, opens on hover) */
+.ag-dock-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transform: scale(0.94);
+    transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
+                opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+                transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap;
 }
 
-#antigravity-top-controls.ag-dock-collapsed .ag-control-btn:not(.ag-toggle-btn) {
-    display: none !important;
+#antigravity-top-controls:hover .ag-dock-actions,
+#antigravity-top-controls.ag-dock-expanded .ag-dock-actions {
+    max-width: 900px;
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
 }
 
+/* Sleek StreamFlow Brand Trigger Pill */
 .ag-toggle-btn {
-    background: rgba(255, 255, 255, 0.12) !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
-    padding: 6px 10px !important;
-    font-size: 11px !important;
+    background: rgba(255, 255, 255, 0.10) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    color: #FFFFFF !important;
+    padding: 6px 14px !important;
+    border-radius: 9999px !important;
+    font-size: 13px !important;
     font-weight: 700 !important;
+    letter-spacing: -0.2px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .ag-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.25) !important;
+    background: rgba(255, 255, 255, 0.18) !important;
+    border-color: rgba(255, 255, 255, 0.38) !important;
+    transform: scale(1.03) !important;
+}
+
+.ag-toggle-btn .ag-bolt {
+    color: #f59e0b;
+    font-size: 14px;
+    line-height: 1;
+    display: inline-block;
+    filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6));
+    animation: agBoltPulse 2.5s infinite ease-in-out;
+}
+
+@keyframes agBoltPulse {
+    0%, 100% { transform: scale(1); opacity: 0.95; }
+    50% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.9)); }
+}
+
+.ag-toggle-btn .ag-brand-text {
+    font-weight: 700;
+    color: #FFFFFF;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .ag-control-btn {
@@ -1853,30 +1910,30 @@ CINEMA_JS = r"""
             dlBtn.textContent = isMusicSite ? '🎵 Download MP3' : '⬇️ Download Video';
             dlBtn.title = isMusicSite ? 'Download 320kbps MP3 audio' : 'Download current video';
 
-            // Minimize / Collapse Button
+            // Brand Trigger Button (⚡ StreamFlow) - Opens on hover, collapses when cursor leaves
             const minBtn = document.createElement('button');
             minBtn.className = 'ag-control-btn ag-toggle-btn';
             minBtn.id = 'agMinBtn';
-            minBtn.textContent = '—';
-            minBtn.title = 'Minimize StreamFlow controls';
+            minBtn.innerHTML = '<span class="ag-bolt">⚡</span><span class="ag-brand-text">StreamFlow</span>';
+            minBtn.title = 'StreamFlow Controls (Hover to open)';
             minBtn.onclick = (e) => {
                 e.stopPropagation();
-                controls.classList.toggle('ag-dock-collapsed');
-                if (controls.classList.contains('ag-dock-collapsed')) {
-                    minBtn.textContent = '⚡ StreamFlow';
-                    minBtn.title = 'Expand StreamFlow controls';
-                } else {
-                    minBtn.textContent = '—';
-                    minBtn.title = 'Minimize StreamFlow controls';
-                }
+                controls.classList.toggle('ag-dock-expanded');
             };
 
+            // Actions wrapper for smooth sliding reveal on hover
+            const actionsWrap = document.createElement('div');
+            actionsWrap.className = 'ag-dock-actions';
+            actionsWrap.id = 'agDockActions';
+
+            actionsWrap.appendChild(fsBtn);
+            actionsWrap.appendChild(studioBtn);
+            actionsWrap.appendChild(musicBtn);
+            actionsWrap.appendChild(modeBtn);
+            actionsWrap.appendChild(dlBtn);
+
             controls.appendChild(minBtn);
-            controls.appendChild(fsBtn);
-            controls.appendChild(studioBtn);
-            controls.appendChild(musicBtn);
-            controls.appendChild(modeBtn);
-            controls.appendChild(dlBtn);
+            controls.appendChild(actionsWrap);
             (document.body || document.documentElement).appendChild(controls);
         }
 
@@ -2162,7 +2219,7 @@ CINEMA_JS = r"""
             }
         };
 
-        // 2-Second Inactivity Auto-Fade for Top Controls
+        // Controls Dock Hover & Inactivity Controller
         controls.addEventListener('mouseenter', () => {
             isHovered = true;
             controls.classList.remove('hidden');
@@ -2177,16 +2234,23 @@ CINEMA_JS = r"""
         function resetTimer() {
             controls.classList.remove('hidden');
             clearTimeout(hideTimer);
-            if (!isHovered) {
+            if (!isHovered && document.body.classList.contains('ag-cinema-active')) {
                 hideTimer = setTimeout(() => {
                     controls.classList.add('hidden');
-                }, 2000);
+                }, 3500);
             }
         }
 
         window.addEventListener('mousemove', resetTimer);
         window.addEventListener('mousedown', resetTimer);
         resetTimer();
+
+        // Clicking outside collapses pinned dock
+        document.addEventListener('click', (e) => {
+            if (controls && !controls.contains(e.target)) {
+                controls.classList.remove('ag-dock-expanded');
+            }
+        });
 
         // Auto-fade dock when user focuses YouTube search bar so it never obstructs typing or autocomplete
         document.addEventListener('focusin', (e) => {
@@ -2591,7 +2655,7 @@ CINEMA_JS = r"""
                     studioUI.classList.remove('active');
                     studioUI.style.display = 'none';
                 }
-                if (topControls) topControls.style.display = 'flex';
+                if (topControls) topControls.style.display = '';
             }
         };
         const setStudioMode = window.setStudioMode;
