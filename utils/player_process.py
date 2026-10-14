@@ -396,147 +396,66 @@ DOCUMENT_START_ADBLOCK_JS = r"""
 (function() {
     'use strict';
     try {
-        function pruneAds(obj) {
-            if (!obj || typeof obj !== 'object') return;
-            const keys = [
-                'adPlacements', 
-                'playerAds', 
-                'adSlots', 
-                'adBreakHeartbeatParams', 
-                'auxiliaryUi', 
-                'adSignalsInfo',
-                'legacyImportant'
-            ];
-            for (let i = 0; i < keys.length; i++) {
-                if (keys[i] in obj) delete obj[keys[i]];
-            }
-            if (obj.playerResponse && typeof obj.playerResponse === 'object') {
-                pruneAds(obj.playerResponse);
-            }
+        const injectCss = () => {
+            if (document.getElementById('ag-early-adblock-style')) return;
+            const style = document.createElement('style');
+            style.id = 'ag-early-adblock-style';
+            style.textContent = `
+                ytd-ad-slot-renderer,
+                ytd-in-feed-ad-layout-renderer,
+                ytd-player-legacy-desktop-watch-ads-renderer,
+                .ytp-ad-module,
+                .ytp-ad-overlay-container,
+                .ytp-ad-player-overlay,
+                .ytp-ad-player-overlay-layout,
+                .ytp-ad-image-overlay,
+                .ytp-ad-text-overlay,
+                #player-ads,
+                #masthead-ad,
+                ytd-banner-promo-renderer,
+                ytd-enforcement-message-view-model,
+                tp-yt-paper-dialog:has(ytd-enforcement-message-view-model),
+                tp-yt-paper-dialog:has(yt-upsell-dialog-renderer),
+                yt-upsell-dialog-renderer {
+                    display: none !important;
+                    visibility: hidden !important;
+                    opacity: 0 !important;
+                    pointer-events: none !important;
+                }
+            `;
+            const root = document.head || document.documentElement;
+            if (root) root.appendChild(style);
+        };
+        injectCss();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', injectCss);
         }
-
-        // 1. Intercept ytInitialPlayerResponse at document-start before YouTube scripts run
-        let _ytResp = undefined;
-        Object.defineProperty(window, 'ytInitialPlayerResponse', {
-            get() { return _ytResp; },
-            set(val) {
-                if (val && typeof val === 'object') pruneAds(val);
-                _ytResp = val;
-            },
-            configurable: true,
-            enumerable: true
-        });
-
-        // 2. Intercept window.fetch at document-start
-        const _origFetch = window.fetch;
-        window.fetch = async function(...args) {
-            const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
-            if (typeof url === 'string' && (
-                url.includes('/api/stats/ads') || 
-                url.includes('/pagead/') || 
-                url.includes('doubleclick.net')
-            )) {
-                return new Response('', { status: 204, statusText: 'No Content' });
-            }
-            const res = await _origFetch.apply(this, args);
-            if (url && url.includes('/youtubei/v1/player')) {
-                try {
-                    const clone = res.clone();
-                    const data = await clone.json();
-                    if (data && typeof data === 'object') {
-                        pruneAds(data);
-                        return new Response(JSON.stringify(data), {
-                            status: res.status,
-                            statusText: res.statusText,
-                            headers: res.headers
-                        });
-                    }
-                } catch(e) {}
-            }
-            return res;
-        };
-
-        // 3. Intercept XMLHttpRequest at document-start
-        const _origOpen = XMLHttpRequest.prototype.open;
-        const _origSend = XMLHttpRequest.prototype.send;
-        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-            this._reqUrl = url;
-            return _origOpen.apply(this, [method, url, ...rest]);
-        };
-        XMLHttpRequest.prototype.send = function(...args) {
-            if (this._reqUrl && this._reqUrl.includes('/youtubei/v1/player')) {
-                this.addEventListener('readystatechange', function() {
-                    if (this.readyState === 4 && this.status === 200) {
-                        try {
-                            const parsed = JSON.parse(this.responseText);
-                            pruneAds(parsed);
-                            Object.defineProperty(this, 'responseText', { value: JSON.stringify(parsed), writable: false, configurable: true });
-                            Object.defineProperty(this, 'response', { value: JSON.stringify(parsed), writable: false, configurable: true });
-                        } catch(e) {}
-                    }
-                });
-            }
-            return _origSend.apply(this, args);
-        };
     } catch(err) {}
 })();
 """
 
 def setup_strict_adblock():
     """
-    Installs multi-layer strict ad-blocking:
-    1. Edge WebView2 native network interceptor (blocks Google Ads, doubleclick, telemetry at the wire level)
-    2. Document-start script injection via AddScriptToExecuteOnDocumentCreatedAsync (prunes ytInitialPlayerResponse before any page script executes)
+    Installs safe document-start CSS pre-injection via CoreWebView2.
+    Hides all ad placeholders and anti-adblock modals instantly from frame 0.
     """
     try:
         import webview.platforms.edgechromium as edge
-        import System.IO
-        
         orig_ready = edge.EdgeChrome.on_webview_ready
-        orig_request = edge.EdgeChrome.on_web_resource_request
         
-        AD_DOMAINS = (
-            "doubleclick.net",
-            "googleads",
-            "pagead2.googlesyndication.com",
-            "adservice.google.",
-            "/api/stats/ads",
-            "/pagead/",
-            "static.doubleclick.net",
-            "ad.doubleclick.net",
-            "securepubads.g.doubleclick.net",
-            "googlesyndication.com",
-        )
-        
-        def patched_web_resource_request(self, sender, args):
-            try:
-                uri = str(args.Request.Uri).lower()
-                # Media chunks, attestation, and YouTube navigation APIs must NEVER be delayed or blocked
-                if any(m in uri for m in ["googlevideo.com", "/videoplayback", "/youtubei/v1/player", "/youtubei/v1/att/get", "/youtubei/v1/browse", "/youtubei/v1/next"]):
-                    return orig_request(self, sender, args)
-                if any(ad in uri for ad in AD_DOMAINS):
-                    empty_stream = System.IO.MemoryStream()
-                    args.Response = sender.CoreWebView2.Environment.CreateWebResourceResponse(
-                        empty_stream, 204, "No Content", "Content-Type: text/plain\r\n"
-                    )
-                    return
-            except Exception:
-                pass
-            return orig_request(self, sender, args)
-            
         def patched_webview_ready(self, sender, args):
             orig_ready(self, sender, args)
             if hasattr(sender, "CoreWebView2") and sender.CoreWebView2:
                 try:
                     sender.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(DOCUMENT_START_ADBLOCK_JS)
                 except Exception as e:
-                    logging.debug(f"Document-start adblock hook note: {e}")
+                    logging.debug(f"Document-start adblock hook: {e}")
                     
-        edge.EdgeChrome.on_web_resource_request = patched_web_resource_request
         edge.EdgeChrome.on_webview_ready = patched_webview_ready
-        logging.info("Strict native WebView2 adblock shield successfully installed.")
+        logging.info("Strict safe document-start adblock shield installed.")
     except Exception as e:
-        logging.info(f"Native WebView2 interceptor fallback (using client-side engine): {e}")
+        logging.info(f"Document-start shield fallback: {e}")
+
 
 
 CINEMA_CSS = """
@@ -678,25 +597,31 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
     transform: translateX(-50%) translateY(-12px);
 }
 
-/* Smooth expandable actions container (collapsed by default, opens on hover or pin) */
+/* Smooth expandable actions container (visible by default, collapses when toggled) */
 .ag-dock-actions {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    max-width: 0;
-    opacity: 0;
+    max-width: 900px;
+    opacity: 1;
     overflow: hidden;
-    pointer-events: none;
-    transform: scale(0.94);
+    pointer-events: auto;
+    transform: scale(1);
     transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
                 opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
                 transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     white-space: nowrap;
 }
 
-#antigravity-top-controls:hover .ag-dock-actions,
-#antigravity-top-controls.ag-dock-expanded .ag-dock-actions,
-#antigravity-top-controls.ag-dock-pinned .ag-dock-actions {
+#antigravity-top-controls.ag-dock-collapsed .ag-dock-actions {
+    max-width: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.94);
+}
+
+#antigravity-top-controls.ag-dock-collapsed:hover .ag-dock-actions,
+#antigravity-top-controls.ag-dock-collapsed.ag-dock-hovered .ag-dock-actions {
     max-width: 900px;
     opacity: 1;
     pointer-events: auto;
@@ -1888,12 +1813,16 @@ CINEMA_JS = r"""
         }
 
         // 5. Inject Top Controls Container
-        let controls = document.getElementById('antigravity-top-controls');
-        if (controls && !document.getElementById('agDockActions')) {
-            controls.remove();
-            controls = null;
-        }
-        if (!controls) {
+        function injectTopControls() {
+            let controls = document.getElementById('antigravity-top-controls');
+            if (controls) {
+                if (!document.getElementById('agDockActions')) {
+                    controls.remove();
+                } else {
+                    return controls;
+                }
+            }
+
             controls = document.createElement('div');
             controls.id = 'antigravity-top-controls';
             
@@ -1955,20 +1884,15 @@ CINEMA_JS = r"""
             dlBtn.textContent = isMusicSite ? '🎵 Download MP3' : '⬇️ Download Video';
             dlBtn.title = isMusicSite ? 'Download 320kbps MP3 audio' : 'Download current video';
 
-            // Brand Trigger Button (⚡ StreamFlow) - Opens on hover, click pins/unpins
+            // Brand Trigger Button (⚡ StreamFlow) - Opens on hover, click toggles collapse
             const minBtn = document.createElement('button');
             minBtn.className = 'ag-control-btn ag-toggle-btn';
             minBtn.id = 'agMinBtn';
-            minBtn.innerHTML = '<span class="ag-bolt">⚡</span><span class="ag-brand-text">StreamFlow</span><span class="ag-chevron">◀</span>';
-            minBtn.title = 'StreamFlow Actions (Hover to reveal, Click to lock/unlock all buttons)';
+            minBtn.innerHTML = '<span class="ag-bolt">⚡</span><span class="ag-brand-text">StreamFlow</span>';
+            minBtn.title = 'Click to collapse/expand dock. Hover to open when collapsed.';
             minBtn.onclick = (e) => {
                 e.stopPropagation();
-                const isPinned = controls.classList.toggle('ag-dock-pinned');
-                if (isPinned) {
-                    controls.classList.add('ag-dock-expanded');
-                } else {
-                    controls.classList.remove('ag-dock-expanded');
-                }
+                controls.classList.toggle('ag-dock-collapsed');
             };
 
             // Actions wrapper for smooth sliding reveal on hover
@@ -1985,14 +1909,17 @@ CINEMA_JS = r"""
             controls.appendChild(minBtn);
             controls.appendChild(actionsWrap);
             (document.body || document.documentElement).appendChild(controls);
+            return controls;
+        }
 
-            // Peek animation on launch: smoothly unfolds for 3.2s so user sees all action buttons, then folds into pill
-            controls.classList.add('ag-dock-expanded');
-            setTimeout(() => {
-                if (!controls.classList.contains('ag-dock-pinned') && !controls.matches(':hover')) {
-                    controls.classList.remove('ag-dock-expanded');
-                }
-            }, 3200);
+        let controls = injectTopControls();
+
+        function ensureTopControls() {
+            if (!document.getElementById('antigravity-top-controls') || !document.getElementById('agDockActions')) {
+                controls = injectTopControls();
+                if (typeof bindControlEvents === 'function') bindControlEvents();
+                if (typeof updatePageMode === 'function') updatePageMode();
+            }
         }
 
         const isMusicSite = window.location.hostname.includes('music.youtube.com');
@@ -2282,37 +2209,44 @@ CINEMA_JS = r"""
         // Controls Dock Hover & Inactivity Controller
         let leaveDebounceTimer;
 
-        controls.addEventListener('mouseenter', () => {
-            isHovered = true;
-            controls.classList.add('ag-dock-expanded');
-            controls.classList.remove('hidden');
-            clearTimeout(hideTimer);
-            clearTimeout(leaveDebounceTimer);
-        });
+        function bindControlEvents() {
+            const ctrl = document.getElementById('antigravity-top-controls');
+            if (!ctrl || ctrl._eventsBound) return;
+            ctrl._eventsBound = true;
 
-        controls.addEventListener('mousemove', () => {
-            if (!controls.classList.contains('ag-dock-expanded')) {
-                controls.classList.add('ag-dock-expanded');
-            }
-        });
+            ctrl.addEventListener('mouseenter', () => {
+                isHovered = true;
+                ctrl.classList.add('ag-dock-hovered');
+                ctrl.classList.remove('hidden');
+                clearTimeout(hideTimer);
+                clearTimeout(leaveDebounceTimer);
+            });
 
-        controls.addEventListener('mouseleave', () => {
-            isHovered = false;
-            clearTimeout(leaveDebounceTimer);
-            leaveDebounceTimer = setTimeout(() => {
-                if (!controls.classList.contains('ag-dock-pinned') && !controls.matches(':hover')) {
-                    controls.classList.remove('ag-dock-expanded');
+            ctrl.addEventListener('mousemove', () => {
+                if (!ctrl.classList.contains('ag-dock-hovered')) {
+                    ctrl.classList.add('ag-dock-hovered');
                 }
-            }, 250);
-            resetTimer();
-        });
+            });
+
+            ctrl.addEventListener('mouseleave', () => {
+                isHovered = false;
+                clearTimeout(leaveDebounceTimer);
+                leaveDebounceTimer = setTimeout(() => {
+                    ctrl.classList.remove('ag-dock-hovered');
+                }, 200);
+                resetTimer();
+            });
+        }
+        bindControlEvents();
 
         function resetTimer() {
-            controls.classList.remove('hidden');
+            const ctrl = document.getElementById('antigravity-top-controls');
+            if (ctrl) ctrl.classList.remove('hidden');
             clearTimeout(hideTimer);
             if (!isHovered && document.body.classList.contains('ag-cinema-active')) {
                 hideTimer = setTimeout(() => {
-                    controls.classList.add('hidden');
+                    const c = document.getElementById('antigravity-top-controls');
+                    if (c) c.classList.add('hidden');
                 }, 3500);
             }
         }
@@ -2321,12 +2255,11 @@ CINEMA_JS = r"""
         window.addEventListener('mousedown', resetTimer);
         resetTimer();
 
-        // Clicking outside collapses dock unless pinned
+        // Clicking outside collapses hover expansion
         document.addEventListener('click', (e) => {
-            if (controls && !controls.contains(e.target)) {
-                if (!controls.classList.contains('ag-dock-pinned')) {
-                    controls.classList.remove('ag-dock-expanded');
-                }
+            const ctrl = document.getElementById('antigravity-top-controls');
+            if (ctrl && !ctrl.contains(e.target)) {
+                ctrl.classList.remove('ag-dock-hovered');
             }
         });
 
@@ -3768,12 +3701,41 @@ CINEMA_JS = r"""
 
         function processAdBlocker() {
             try {
+                // Ensure top controls are always present in the DOM
+                if (typeof ensureTopControls === 'function') {
+                    ensureTopControls();
+                }
+
                 const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
                 const video = document.querySelector('video');
 
-                // 1. Precise in-stream ad detection:
-                // YouTube strictly adds 'ad-showing' or 'ad-interrupting' class to the movie player when an ad is playing.
-                const isAdShowing = !!(player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')));
+                // 1. Unconditionally click any skip button across the entire page
+                const skipSelectors = [
+                    '.ytp-ad-skip-button',
+                    '.ytp-ad-skip-button-modern',
+                    '.ytp-skip-ad-button',
+                    '.ytp-ad-skip-button-slot button',
+                    '.ytp-ad-skip-button-container button',
+                    'button[class*="ytp-ad-skip"]',
+                    '.ytp-ad-overlay-close-button',
+                    'button.ytp-ad-survey-answer'
+                ];
+                for (let i = 0; i < skipSelectors.length; i++) {
+                    const btns = document.querySelectorAll(skipSelectors[i]);
+                    for (let j = 0; j < btns.length; j++) {
+                        if (btns[j] && typeof btns[j].click === 'function') {
+                            try { btns[j].click(); } catch(e) {}
+                        }
+                    }
+                }
+
+                // 2. Multi-signal in-stream ad detection
+                const hasAdClass = !!(player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')));
+                const hasAdOverlay = !!document.querySelector(
+                    '.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-module:not([style*="display: none"]), .ytp-ad-text, .ytp-ad-preview-container'
+                );
+                const isAdState = !!(player && typeof player.getAdState === 'function' && player.getAdState() > 0);
+                const isAdShowing = hasAdClass || hasAdOverlay || isAdState;
 
                 if (isAdShowing && video) {
                     if (!isAdActive) {
@@ -3798,24 +3760,7 @@ CINEMA_JS = r"""
                         try { player.skipAd(); } catch(e) {}
                     }
 
-                    // D. Auto-click any skip button
-                    const skipSelectors = [
-                        '.ytp-ad-skip-button',
-                        '.ytp-ad-skip-button-modern',
-                        '.ytp-skip-ad-button',
-                        '.ytp-ad-skip-button-slot button',
-                        '.ytp-ad-skip-button-container button',
-                        'button[class*="ytp-ad-skip"]',
-                        '.ytp-ad-overlay-close-button'
-                    ];
-                    for (let i = 0; i < skipSelectors.length; i++) {
-                        const btn = document.querySelector(skipSelectors[i]);
-                        if (btn && typeof btn.click === 'function') {
-                            try { btn.click(); } catch(e) {}
-                        }
-                    }
-
-                    // E. Remove visual ad overlays
+                    // D. Remove visual ad overlays
                     const adOverlays = document.querySelectorAll(
                         '.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-image-overlay, .ytp-ad-text-overlay'
                     );
@@ -3836,7 +3781,7 @@ CINEMA_JS = r"""
                     }
                 }
 
-                // 2. Auto-dismiss & remove YouTube Anti-Adblock Warning Modals
+                // 3. Auto-dismiss & remove YouTube Anti-Adblock Warning Modals
                 const enforcement = document.querySelector('ytd-enforcement-message-view-model, yt-upsell-dialog-renderer');
                 if (enforcement) {
                     const modal = enforcement.closest('tp-yt-paper-dialog') || enforcement;
@@ -3866,7 +3811,7 @@ CINEMA_JS = r"""
                     }
                 }
 
-                // 3. Remove non-video promotional overlays
+                // 4. Remove non-video promotional overlays
                 const promo = document.querySelector('.ytp-ad-overlay-container, ytd-banner-promo-renderer');
                 if (promo) promo.remove();
 
@@ -3924,12 +3869,15 @@ CINEMA_JS = r"""
 
 def on_loaded(window):
     """Inject permanent adblock CSS shield, cinema styling, controls styling, studio music styling, view switcher, and stealth ad-blocker engine"""
-    js_payload = CINEMA_JS.replace("{adblock_css_json}", json.dumps(ADBLOCK_CSS))\
-                          .replace("{cinema_css_json}", json.dumps(CINEMA_CSS))\
-                          .replace("{controls_css_json}", json.dumps(CONTROLS_CSS))\
-                          .replace("{studio_music_css_json}", json.dumps(STUDIO_MUSIC_CSS))\
-                          .replace("{studio_assets_json}", json.dumps(STUDIO_ASSETS))
-    window.evaluate_js(js_payload)
+    try:
+        js_payload = CINEMA_JS.replace("{adblock_css_json}", json.dumps(ADBLOCK_CSS))\
+                              .replace("{cinema_css_json}", json.dumps(CINEMA_CSS))\
+                              .replace("{controls_css_json}", json.dumps(CONTROLS_CSS))\
+                              .replace("{studio_music_css_json}", json.dumps(STUDIO_MUSIC_CSS))\
+                              .replace("{studio_assets_json}", json.dumps(STUDIO_ASSETS))
+        window.evaluate_js(js_payload)
+    except Exception as e:
+        logging.debug(f"on_loaded injection note: {e}")
 
 def main():
     global active_window
@@ -3946,11 +3894,10 @@ def main():
     else:
         watch_url = f"https://www.youtube.com/watch?v={video_id}"
 
-    
     # Start physical ESC key listener
     start_esc_listener()
 
-    # Install multi-layer strict adblock shield (native network block + document-start pre-injection)
+    # Install safe document-start CSS adblock shield
     setup_strict_adblock()
     
     api = PlayerApi()
@@ -3969,6 +3916,16 @@ def main():
     
     # Bind page load to inject cinema UI, view switcher, and download button
     window.events.loaded += lambda: on_loaded(window)
+
+    # Secondary injection timer to guarantee injection even on fast/cached loads or missed loaded events
+    def delayed_injection():
+        time.sleep(1.0)
+        on_loaded(window)
+        time.sleep(2.0)
+        on_loaded(window)
+
+    t = threading.Thread(target=delayed_injection, daemon=True)
+    t.start()
     
     try:
         webview.start(private_mode=False)
@@ -3977,3 +3934,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
