@@ -450,9 +450,13 @@ def setup_strict_adblock():
                     sender.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(DOCUMENT_START_ADBLOCK_JS)
                 except Exception as e:
                     logging.debug(f"Document-start adblock hook: {e}")
+                try:
+                    sender.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(get_cinema_payload())
+                except Exception as e:
+                    logging.debug(f"Document-start cinema hook: {e}")
                     
         edge.EdgeChrome.on_webview_ready = patched_webview_ready
-        logging.info("Strict safe document-start adblock shield installed.")
+        logging.info("Strict safe document-start adblock and cinema controls shield installed.")
     except Exception as e:
         logging.info(f"Document-start shield fallback: {e}")
 
@@ -597,31 +601,25 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
     transform: translateX(-50%) translateY(-12px);
 }
 
-/* Smooth expandable actions container (visible by default, collapses when toggled) */
+/* Smooth expandable actions container: collapsed by default, expands on hover */
 .ag-dock-actions {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    max-width: 900px;
-    opacity: 1;
+    max-width: 0;
+    opacity: 0;
     overflow: hidden;
-    pointer-events: auto;
-    transform: scale(1);
+    pointer-events: none;
+    transform: scale(0.95);
     transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
                 opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
                 transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     white-space: nowrap;
 }
 
-#antigravity-top-controls.ag-dock-collapsed .ag-dock-actions {
-    max-width: 0;
-    opacity: 0;
-    pointer-events: none;
-    transform: scale(0.94);
-}
-
-#antigravity-top-controls.ag-dock-collapsed:hover .ag-dock-actions,
-#antigravity-top-controls.ag-dock-collapsed.ag-dock-hovered .ag-dock-actions {
+#antigravity-top-controls:hover .ag-dock-actions,
+#antigravity-top-controls.ag-dock-hovered .ag-dock-actions,
+#antigravity-top-controls.ag-dock-expanded .ag-dock-actions {
     max-width: 900px;
     opacity: 1;
     pointer-events: auto;
@@ -1819,9 +1817,15 @@ CINEMA_JS = r"""
                 if (!document.getElementById('agDockActions')) {
                     controls.remove();
                 } else {
+                    if (document.body && controls.parentElement !== document.body) {
+                        document.body.appendChild(controls);
+                    }
                     return controls;
                 }
             }
+
+            const targetParent = document.body || document.documentElement;
+            if (!targetParent) return null;
 
             controls = document.createElement('div');
             controls.id = 'antigravity-top-controls';
@@ -1888,11 +1892,18 @@ CINEMA_JS = r"""
             const minBtn = document.createElement('button');
             minBtn.className = 'ag-control-btn ag-toggle-btn';
             minBtn.id = 'agMinBtn';
-            minBtn.innerHTML = '<span class="ag-bolt">⚡</span><span class="ag-brand-text">StreamFlow</span>';
-            minBtn.title = 'Click to collapse/expand dock. Hover to open when collapsed.';
+            const boltSpan = document.createElement('span');
+            boltSpan.className = 'ag-bolt';
+            boltSpan.textContent = '⚡';
+            const textSpan = document.createElement('span');
+            textSpan.className = 'ag-brand-text';
+            textSpan.textContent = 'StreamFlow';
+            minBtn.appendChild(boltSpan);
+            minBtn.appendChild(textSpan);
+            minBtn.title = 'Click to pin/unpin dock. Hover to open.';
             minBtn.onclick = (e) => {
                 e.stopPropagation();
-                controls.classList.toggle('ag-dock-collapsed');
+                controls.classList.toggle('ag-dock-expanded');
             };
 
             // Actions wrapper for smooth sliding reveal on hover
@@ -1908,17 +1919,20 @@ CINEMA_JS = r"""
 
             controls.appendChild(minBtn);
             controls.appendChild(actionsWrap);
-            (document.body || document.documentElement).appendChild(controls);
+            targetParent.appendChild(controls);
             return controls;
         }
 
         let controls = injectTopControls();
 
         function ensureTopControls() {
-            if (!document.getElementById('antigravity-top-controls') || !document.getElementById('agDockActions')) {
+            let controls = document.getElementById('antigravity-top-controls');
+            if (!controls || !document.getElementById('agDockActions')) {
                 controls = injectTopControls();
                 if (typeof bindControlEvents === 'function') bindControlEvents();
                 if (typeof updatePageMode === 'function') updatePageMode();
+            } else if (document.body && controls.parentElement !== document.body) {
+                document.body.appendChild(controls);
             }
         }
 
@@ -1935,6 +1949,7 @@ CINEMA_JS = r"""
         const dlBtn = document.getElementById('agDlBtn');
 
         function updatePageMode() {
+            if (!document.body) return;
             const isMusic = window.location.hostname.includes('music.youtube.com');
             const hasVideo = window.location.search.includes('v=');
 
@@ -2243,7 +2258,7 @@ CINEMA_JS = r"""
             const ctrl = document.getElementById('antigravity-top-controls');
             if (ctrl) ctrl.classList.remove('hidden');
             clearTimeout(hideTimer);
-            if (!isHovered && document.body.classList.contains('ag-cinema-active')) {
+            if (!isHovered && document.body && document.body.classList.contains('ag-cinema-active')) {
                 hideTimer = setTimeout(() => {
                     const c = document.getElementById('antigravity-top-controls');
                     if (c) c.classList.add('hidden');
@@ -3861,21 +3876,40 @@ CINEMA_JS = r"""
             if (typeof updatePageMode === 'function') updatePageMode();
         });
 
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                ensureTopControls();
+                updatePageMode();
+                processAdBlocker();
+            });
+            window.addEventListener('load', () => {
+                ensureTopControls();
+                updatePageMode();
+                processAdBlocker();
+            });
+        }
+
     } catch(err) {
         console.error('Antigravity Cinema Init Error:', err);
     }
 })();
 """
 
+def get_cinema_payload():
+    return CINEMA_JS.replace("{adblock_css_json}", json.dumps(ADBLOCK_CSS))\
+                    .replace("{cinema_css_json}", json.dumps(CINEMA_CSS))\
+                    .replace("{controls_css_json}", json.dumps(CONTROLS_CSS))\
+                    .replace("{studio_music_css_json}", json.dumps(STUDIO_MUSIC_CSS))\
+                    .replace("{studio_assets_json}", json.dumps(STUDIO_ASSETS))
+
 def on_loaded(window):
     """Inject permanent adblock CSS shield, cinema styling, controls styling, studio music styling, view switcher, and stealth ad-blocker engine"""
     try:
-        js_payload = CINEMA_JS.replace("{adblock_css_json}", json.dumps(ADBLOCK_CSS))\
-                              .replace("{cinema_css_json}", json.dumps(CINEMA_CSS))\
-                              .replace("{controls_css_json}", json.dumps(CONTROLS_CSS))\
-                              .replace("{studio_music_css_json}", json.dumps(STUDIO_MUSIC_CSS))\
-                              .replace("{studio_assets_json}", json.dumps(STUDIO_ASSETS))
-        window.evaluate_js(js_payload)
+        payload = get_cinema_payload()
+        if hasattr(window, 'run_js'):
+            window.run_js(payload)
+        else:
+            window.evaluate_js(payload)
     except Exception as e:
         logging.debug(f"on_loaded injection note: {e}")
 
