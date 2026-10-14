@@ -123,7 +123,7 @@ export const HistoryPage: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search downloads or channel…"
-            className="w-full h-8.5 pl-8 pr-3 bg-surface-elevated/70 border border-border-glass rounded-xl text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary transition-colors"
+            className="w-full h-8.5 pl-8 pr-3 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary transition-colors shadow-sm"
           />
         </div>
 

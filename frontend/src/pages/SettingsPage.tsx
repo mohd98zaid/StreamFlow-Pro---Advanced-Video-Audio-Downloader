@@ -8,6 +8,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Check,
+  ChevronDown,
 } from "lucide-react";
 import { useSettingsStore } from "../stores/useSettingsStore";
 import { useToastStore } from "../stores/useToastStore";
@@ -59,7 +60,7 @@ export const SettingsPage: React.FC = () => {
                   type="text"
                   value={config.download_path || ""}
                   readOnly
-                  className="flex-1 h-10 px-3.5 bg-surface-elevated/70 border border-border-glass rounded-xl text-xs text-foreground font-mono"
+                  className="flex-1 h-10 px-3.5 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl text-xs text-foreground font-mono shadow-sm"
                 />
                 <button
                   onClick={browseFolder}
@@ -92,17 +93,20 @@ export const SettingsPage: React.FC = () => {
               <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
                 Concurrent Download Workers
               </label>
-              <select
-                value={config.concurrent_downloads || 3}
-                onChange={(e) => handleUpdate({ concurrent_downloads: parseInt(e.target.value) })}
-                className="w-full h-10 bg-surface-elevated/80 border border-border-glass rounded-xl px-3.5 text-xs text-foreground focus:outline-none focus:border-primary font-medium"
-              >
-                {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-                  <option key={n} value={n}>
-                    {n} Parallel Threads
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full">
+                <select
+                  value={config.concurrent_downloads || 3}
+                  onChange={(e) => handleUpdate({ concurrent_downloads: parseInt(e.target.value) })}
+                  className="w-full h-10 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl pl-3.5 pr-9 text-xs text-foreground font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all appearance-none cursor-pointer shadow-sm"
+                >
+                  {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+                    <option key={n} value={n} className="bg-[#10141D] text-foreground py-1">
+                      {n} Parallel Threads
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-foreground-muted pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+              </div>
               <span className="text-[11px] text-foreground-subtle mt-1.5 block">
                 Thread pool allocation for simultaneous yt-dlp tasks.
               </span>
@@ -116,7 +120,7 @@ export const SettingsPage: React.FC = () => {
                 type="text"
                 value={config.filename_pattern || "%(title)s.%(ext)s"}
                 onChange={(e) => handleUpdate({ filename_pattern: e.target.value })}
-                className="w-full h-10 bg-surface-elevated/80 border border-border-glass rounded-xl px-3.5 text-xs text-foreground focus:outline-none focus:border-primary font-mono"
+                className="w-full h-10 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl px-3.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all shadow-sm"
               />
               <span className="text-[11px] text-foreground-subtle mt-1.5 block">
                 Standard yt-dlp format string (e.g. <code>%(title)s.%(ext)s</code>).

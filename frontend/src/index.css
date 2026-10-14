@@ -5,51 +5,86 @@
 @tailwind utilities;
 
 :root {
-  /* Default Dark Mode Theme Tokens - Deep Luxury Media Workstation */
-  --background: #090B0F;
-  --surface: #10141D;
-  --surface-elevated: #161C27;
+  /* Default Dark Mode Theme Tokens - Deep Luxury Media Workstation (RGB Triplets for full alpha support) */
+  --background: 9 11 15;
+  --surface: 16 20 29;
+  --surface-elevated: 22 28 39;
+  --foreground: 248 250 252;
+  --foreground-muted: 148 163 184;
+  --foreground-subtle: 100 116 139;
+  --primary: 99 102 241;
+  --primary-hover: 129 140 248;
+  --success: 52 211 153;
+  --warning: 251 191 36;
+  --danger: 248 113 113;
+  --accent-cyan: 56 189 248;
+
+  /* Glass and Alpha Surfaces */
   --surface-glass: rgba(16, 20, 29, 0.72);
   --surface-glass-card: rgba(22, 28, 39, 0.65);
   --border: rgba(255, 255, 255, 0.08);
   --border-glass: rgba(255, 255, 255, 0.12);
   --border-hairline: rgba(255, 255, 255, 0.05);
   --border-focus: #6366F1;
-  --foreground: #F8FAFC;
-  --foreground-muted: #94A3B8;
-  --foreground-subtle: #64748B;
-  --primary: #6366F1;
-  --primary-hover: #818CF8;
   --primary-glass: rgba(99, 102, 241, 0.18);
-  --success: #34D399;
-  --warning: #FBBF24;
-  --danger: #F87171;
-  --accent-cyan: #38BDF8;
   --accent-cyan-glass: rgba(56, 189, 248, 0.16);
 }
 
 .light {
-  /* Light Mode Theme Tokens - Clean Neutral Glass Workstation */
-  --background: #F4F6F9;
-  --surface: #FFFFFF;
-  --surface-elevated: #ECEFF4;
+  /* Light Mode Theme Tokens - Clean Neutral Glass Workstation (RGB Triplets) */
+  --background: 244 246 249;
+  --surface: 255 255 255;
+  --surface-elevated: 236 239 244;
+  --foreground: 15 23 42;
+  --foreground-muted: 71 85 105;
+  --foreground-subtle: 148 163 184;
+  --primary: 79 70 229;
+  --primary-hover: 67 56 202;
+  --success: 5 150 105;
+  --warning: 217 119 6;
+  --danger: 220 38 38;
+  --accent-cyan: 2 132 199;
+
   --surface-glass: rgba(255, 255, 255, 0.82);
   --surface-glass-card: rgba(255, 255, 255, 0.7);
   --border: rgba(0, 0, 0, 0.08);
   --border-glass: rgba(0, 0, 0, 0.12);
   --border-hairline: rgba(0, 0, 0, 0.04);
   --border-focus: #4F46E5;
-  --foreground: #0F172A;
-  --foreground-muted: #475569;
-  --foreground-subtle: #94A3B8;
-  --primary: #4F46E5;
-  --primary-hover: #4338CA;
   --primary-glass: rgba(79, 70, 229, 0.12);
-  --success: #059669;
-  --warning: #D97706;
-  --danger: #DC2626;
-  --accent-cyan: #0284C7;
   --accent-cyan-glass: rgba(2, 132, 199, 0.12);
+}
+
+/* Global Form Controls & Select Theme Hardening */
+select, input, textarea {
+  color-scheme: dark;
+}
+
+.light select, .light input, .light textarea {
+  color-scheme: light;
+}
+
+select {
+  background-color: #161C27 !important;
+  color: #F8FAFC !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+select option {
+  background-color: #10141D !important;
+  color: #F8FAFC !important;
+  padding: 8px 12px;
+}
+
+.light select {
+  background-color: #ECEFF4 !important;
+  color: #0F172A !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+.light select option {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
 }
 
 /* Custom Scrollbars */
@@ -156,7 +191,7 @@
   width: 42px;
   height: 24px;
   border-radius: 9999px;
-  background-color: var(--surface-elevated);
+  background-color: rgb(var(--surface-elevated));
   border: 1px solid var(--border-glass);
   position: relative;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -164,8 +199,8 @@
 }
 
 .switch-root[data-state="checked"] {
-  background-color: var(--primary);
-  border-color: var(--primary);
+  background-color: rgb(var(--primary));
+  border-color: rgb(var(--primary));
 }
 
 .switch-thumb {

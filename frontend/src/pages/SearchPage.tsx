@@ -95,7 +95,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onGoToQueue }) => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search videos, music tracks, artists, or keywords..."
-            className="w-full h-11 pl-10 pr-4 glass-panel border border-border-glass rounded-2xl text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-glass-sm transition-all"
+            className="w-full h-11 pl-10 pr-4 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-2xl text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-glass-sm transition-all"
           />
         </div>
 
