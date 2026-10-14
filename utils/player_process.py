@@ -540,14 +540,25 @@ def setup_strict_adblock():
 
 
 CINEMA_CSS = """
-/* Hide external YouTube UI: headers, sidebar recommendations, comments in Cinema Mode */
-#masthead-container, #masthead, #guide, #guide-wrapper, #secondary, #comments, 
-#below, #chat, #ticker, #voice-search-button, #chips, ytd-feed-filter-chip-bar-renderer {
+/* Hide external YouTube UI: headers, sidebar recommendations, comments ONLY in Cinema Mode */
+body.ag-cinema-active #masthead-container, 
+body.ag-cinema-active #masthead, 
+body.ag-cinema-active #guide, 
+body.ag-cinema-active #guide-wrapper, 
+body.ag-cinema-active #secondary, 
+body.ag-cinema-active #comments, 
+body.ag-cinema-active #below, 
+body.ag-cinema-active #chat, 
+body.ag-cinema-active #ticker, 
+body.ag-cinema-active #voice-search-button, 
+body.ag-cinema-active #chips, 
+body.ag-cinema-active ytd-feed-filter-chip-bar-renderer {
     display: none !important;
 }
 
-/* Base full viewport reset */
-html, body {
+/* Base full viewport reset ONLY in Cinema Mode */
+body.ag-cinema-active,
+body.ag-cinema-active html {
     overflow: hidden !important;
     background-color: #000000 !important;
     margin: 0 !important;
@@ -556,8 +567,9 @@ html, body {
     height: 100vh !important;
 }
 
-/* Master Player Container Expansion */
-#movie_player, .html5-video-player {
+/* Master Player Container Expansion ONLY in Cinema Mode */
+body.ag-cinema-active #movie_player, 
+body.ag-cinema-active .html5-video-player {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -571,13 +583,13 @@ html, body {
     background: #000000 !important;
 }
 
-/* Ensure Video Container fills the space correctly */
-.html5-video-container {
+/* Ensure Video Container fills the space correctly in Cinema Mode */
+body.ag-cinema-active .html5-video-container {
     width: 100% !important;
     height: 100% !important;
 }
 
-.html5-video-container video {
+body.ag-cinema-active .html5-video-container video {
     width: 100% !important;
     height: 100% !important;
     top: 0 !important;
@@ -585,9 +597,16 @@ html, body {
     object-fit: contain !important;
 }
 
-/* Ensure Controls Bar, Settings Menu, Subtitles, and Seekbar are ON TOP and fully visible */
-.ytp-chrome-bottom, .ytp-chrome-top, .ytp-gradient-bottom, .ytp-gradient-top, 
-.ytp-popup, .ytp-settings-menu, .ytp-panel, .ytp-menuitem, .ytp-caption-window-container {
+/* Ensure Controls Bar, Settings Menu, Subtitles, and Seekbar are ON TOP in Cinema Mode */
+body.ag-cinema-active .ytp-chrome-bottom, 
+body.ag-cinema-active .ytp-chrome-top, 
+body.ag-cinema-active .ytp-gradient-bottom, 
+body.ag-cinema-active .ytp-gradient-top, 
+body.ag-cinema-active .ytp-popup, 
+body.ag-cinema-active .ytp-settings-menu, 
+body.ag-cinema-active .ytp-panel, 
+body.ag-cinema-active .ytp-menuitem, 
+body.ag-cinema-active .ytp-caption-window-container {
     z-index: 2000000000 !important;
 }
 """
@@ -1949,30 +1968,41 @@ CINEMA_JS = r"""
         const musicBtn = document.getElementById('agMusicBtn');
         const dlBtn = document.getElementById('agDlBtn');
 
-        if (isMusicSite) {
-            document.body.classList.add('ag-music-site');
-            document.body.classList.remove('ag-cinema-active');
-            if (cinemaStyle) cinemaStyle.disabled = true;
-            if (modeBtn) modeBtn.style.display = 'none';
-            if (musicBtn) {
-                musicBtn.textContent = '📺 Switch to YouTube';
-                musicBtn.title = 'Switch to YouTube video player';
-            }
-            if (dlBtn) {
-                dlBtn.textContent = '🎵 Download MP3';
-                dlBtn.title = 'Download 320kbps MP3 audio';
-            }
-        } else {
-            document.body.classList.remove('ag-music-site');
-            document.body.classList.toggle('ag-cinema-active', isCinema);
-            if (!isCinema && cinemaStyle) {
-                cinemaStyle.disabled = true;
-                if (modeBtn) {
-                    modeBtn.textContent = '🎬 Cinema View';
-                    modeBtn.style.background = 'rgba(37, 99, 235, 0.92)';
+        function updatePageMode() {
+            const isMusic = window.location.hostname.includes('music.youtube.com');
+            const hasVideo = window.location.search.includes('v=');
+
+            if (isMusic) {
+                document.body.classList.add('ag-music-site');
+                document.body.classList.remove('ag-cinema-active');
+                if (modeBtn) modeBtn.style.display = 'none';
+                if (musicBtn) {
+                    musicBtn.textContent = '📺 Switch to YouTube';
+                    musicBtn.title = 'Switch to YouTube video player';
+                }
+                if (dlBtn) {
+                    dlBtn.textContent = '🎵 Download MP3';
+                    dlBtn.title = 'Download 320kbps MP3 audio';
+                }
+            } else {
+                document.body.classList.remove('ag-music-site');
+                if (!hasVideo) {
+                    // On YouTube Home or Search: NEVER enable cinema mode, keep YouTube header & search bar 100% visible
+                    isCinema = false;
+                    document.body.classList.remove('ag-cinema-active');
+                    if (modeBtn) modeBtn.style.display = 'none';
+                } else {
+                    // On video watch page: respect current cinema mode state
+                    document.body.classList.toggle('ag-cinema-active', isCinema);
+                    if (modeBtn) {
+                        modeBtn.style.display = '';
+                        modeBtn.textContent = isCinema ? '🌐 YouTube View' : '🎬 Cinema View';
+                        modeBtn.style.background = isCinema ? 'rgba(15, 23, 42, 0.92)' : 'rgba(37, 99, 235, 0.92)';
+                    }
                 }
             }
         }
+        updatePageMode();
 
         function updateFullscreenState(state) {
             if (fsBtn) {
@@ -2022,16 +2052,7 @@ CINEMA_JS = r"""
         if (modeBtn) {
             modeBtn.onclick = () => {
                 isCinema = !isCinema;
-                document.body.classList.toggle('ag-cinema-active', isCinema);
-                if (isCinema) {
-                    cinemaStyle.disabled = false;
-                    modeBtn.textContent = '🌐 YouTube View';
-                    modeBtn.style.background = 'rgba(15, 23, 42, 0.92)';
-                } else {
-                    cinemaStyle.disabled = true;
-                    modeBtn.textContent = '🎬 Cinema View';
-                    modeBtn.style.background = 'rgba(37, 99, 235, 0.92)';
-                }
+                updatePageMode();
             };
         }
 
@@ -2252,19 +2273,6 @@ CINEMA_JS = r"""
             }
         });
 
-        // Auto-fade dock when user focuses YouTube search bar so it never obstructs typing or autocomplete
-        document.addEventListener('focusin', (e) => {
-            if (e.target && (e.target.matches('input#search') || e.target.matches('input[name="search_query"]') || e.target.closest('ytd-searchbox, ytmusic-search-box'))) {
-                if (!document.body.classList.contains('ag-cinema-active')) {
-                    controls.classList.add('hidden');
-                }
-            }
-        }, true);
-        document.addEventListener('focusout', (e) => {
-            if (e.target && (e.target.matches('input#search') || e.target.matches('input[name="search_query"]') || e.target.closest('ytd-searchbox, ytmusic-search-box'))) {
-                resetTimer();
-            }
-        }, true);
 
         // Lightweight Draggable Support for Floating Controls Dock
         let isDragging = false;
@@ -3844,7 +3852,11 @@ CINEMA_JS = r"""
         // Keep active across Single Page Application (SPA) YouTube video navigations
         window.addEventListener('yt-navigate-finish', () => {
             isAdActive = false;
+            if (typeof updatePageMode === 'function') updatePageMode();
             processAdBlocker();
+        });
+        window.addEventListener('popstate', () => {
+            if (typeof updatePageMode === 'function') updatePageMode();
         });
 
     } catch(err) {
