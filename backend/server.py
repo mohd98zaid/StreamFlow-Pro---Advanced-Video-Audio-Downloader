@@ -14,6 +14,7 @@ from typing import Dict, Any, List, Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 
@@ -178,6 +179,7 @@ class OpenPlayerRequest(BaseModel):
 
 
 @app.get("/api/health")
+@app.get("/api/status")
 def health():
     return {"status": "ok", "service": "StreamFlow Pro Bridge", "engine_ready": True}
 
@@ -356,6 +358,12 @@ def browse_directory():
 def shutdown():
     adapter.downloader.shutdown()
     return {"success": True, "message": "Downloader engine shutdown cleanly"}
+
+
+# Mount frontend production dist if available to serve desktop UI over HTTP
+dist_dir = ROOT_DIR / "frontend" / "dist"
+if dist_dir.exists():
+    app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="frontend")
 
 
 def start_server(host: str = "127.0.0.1", port: int = 47891):
