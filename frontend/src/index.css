@@ -64,20 +64,22 @@ select, input, textarea {
   color-scheme: light;
 }
 
-select {
+:root:not(.light) select,
+.dark select {
   background-color: #161C27 !important;
   color: #F8FAFC !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
-select option {
+:root:not(.light) select option,
+.dark select option {
   background-color: #10141D !important;
   color: #F8FAFC !important;
   padding: 8px 12px;
 }
 
 .light select {
-  background-color: #ECEFF4 !important;
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
   border-color: rgba(0, 0, 0, 0.12) !important;
 }
@@ -85,6 +87,14 @@ select option {
 .light select option {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
+  padding: 8px 12px;
+}
+
+.light input:not([type="checkbox"]):not([type="radio"]),
+.light textarea {
+  background-color: #FFFFFF;
+  color: #0F172A;
+  border-color: rgba(0, 0, 0, 0.12);
 }
 
 /* Custom Scrollbars */

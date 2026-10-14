@@ -106,10 +106,10 @@ export const FormatOptions: React.FC = () => {
               <select
                 value={activePreset}
                 onChange={(e) => applyPreset(e.target.value)}
-                className="bg-[#161C27] dark:bg-[#161C27] border border-white/12 text-xs rounded-xl pl-3 pr-8 py-1.5 text-foreground font-semibold focus:outline-none focus:border-primary appearance-none cursor-pointer shadow-sm"
+                className="bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 text-xs rounded-xl pl-3 pr-8 py-1.5 text-foreground font-semibold focus:outline-none focus:border-primary appearance-none cursor-pointer shadow-sm"
               >
                 {presets.map((p) => (
-                  <option key={p.name} value={p.name} className="bg-[#10141D] text-foreground">
+                  <option key={p.name} value={p.name} className="bg-white text-slate-900 dark:bg-[#10141D] dark:text-[#F8FAFC]">
                     {p.name}
                   </option>
                 ))}
@@ -128,7 +128,7 @@ export const FormatOptions: React.FC = () => {
             {downloadType === "audio" ? "Audio Bitrate" : "Resolution / Quality"}
           </label>
           {downloadType === "audio" ? (
-            <div className="h-10 px-3.5 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl text-xs flex items-center justify-between text-foreground shadow-sm">
+            <div className="h-10 px-3.5 bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 rounded-xl text-xs flex items-center justify-between text-foreground shadow-sm">
               <span className="font-semibold">Studio 320 kbps (HQ)</span>
               <span className="text-[10px] text-accent-cyan font-bold px-1.5 py-0.5 rounded bg-accent-cyan/15 border border-accent-cyan/25">
                 Pristine Audio
@@ -139,10 +139,10 @@ export const FormatOptions: React.FC = () => {
               <select
                 value={quality}
                 onChange={(e) => setQuality(e.target.value)}
-                className="w-full h-10 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl pl-3 pr-9 text-xs text-foreground font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all appearance-none cursor-pointer shadow-sm"
+                className="w-full h-10 bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 rounded-xl pl-3 pr-9 text-xs text-foreground font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all appearance-none cursor-pointer shadow-sm"
               >
                 {(metadata?.available_qualities || videoQualities).map((q) => (
-                  <option key={q} value={q} className="bg-[#10141D] text-foreground py-1">
+                  <option key={q} value={q} className="bg-white text-slate-900 dark:bg-[#10141D] dark:text-[#F8FAFC] py-1">
                     {q}
                   </option>
                 ))}
@@ -161,10 +161,10 @@ export const FormatOptions: React.FC = () => {
             <select
               value={formatType}
               onChange={(e) => setFormatType(e.target.value)}
-              className="w-full h-10 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl pl-3 pr-9 text-xs text-foreground font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all appearance-none cursor-pointer shadow-sm"
+              className="w-full h-10 bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 rounded-xl pl-3 pr-9 text-xs text-foreground font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all appearance-none cursor-pointer shadow-sm"
             >
               {(downloadType === "audio" ? audioFormats : videoFormats).map((f) => (
-                <option key={f} value={f} className="bg-[#10141D] text-foreground py-1">
+                <option key={f} value={f} className="bg-white text-slate-900 dark:bg-[#10141D] dark:text-[#F8FAFC] py-1">
                   {f.toUpperCase()}
                 </option>
               ))}
@@ -180,7 +180,7 @@ export const FormatOptions: React.FC = () => {
           </label>
           <div className="flex items-center gap-2">
             <div
-              className="flex-1 h-10 px-3 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl text-xs flex items-center text-foreground-muted truncate cursor-pointer hover:border-primary/50 transition-colors shadow-sm"
+              className="flex-1 h-10 px-3 bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 rounded-xl text-xs flex items-center text-foreground-muted truncate cursor-pointer hover:border-primary/50 transition-colors shadow-sm"
               onClick={browseFolder}
               title={config.download_path}
             >
@@ -191,7 +191,7 @@ export const FormatOptions: React.FC = () => {
             </div>
             <button
               onClick={browseFolder}
-              className="h-10 px-3.5 bg-[#161C27] dark:bg-[#161C27] hover:bg-surface-elevated border border-white/12 rounded-xl text-xs font-semibold text-foreground transition-colors shadow-sm"
+              className="h-10 px-3.5 bg-white dark:bg-[#161C27] hover:bg-black/5 dark:hover:bg-white/10 border border-black/10 dark:border-white/12 rounded-xl text-xs font-semibold text-foreground transition-colors shadow-sm"
             >
               Browse
             </button>
@@ -215,13 +215,13 @@ export const FormatOptions: React.FC = () => {
         </button>
 
         {showAdvanced && (
-          <div className="mt-3 p-3.5 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 animate-fade-in shadow-sm">
+          <div className="mt-3 p-3.5 bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 animate-fade-in shadow-sm">
             <label className="flex items-center gap-2.5 text-xs text-foreground cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={embedThumbnail}
                 onChange={(e) => setEmbedThumbnail(e.target.checked)}
-                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-white/20 cursor-pointer accent-primary"
+                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-black/20 dark:border-white/20 cursor-pointer accent-primary"
               />
               <span className="font-medium">Embed Cover Thumbnail</span>
             </label>
@@ -231,7 +231,7 @@ export const FormatOptions: React.FC = () => {
                 type="checkbox"
                 checked={embedMetadata}
                 onChange={(e) => setEmbedMetadata(e.target.checked)}
-                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-white/20 cursor-pointer accent-primary"
+                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-black/20 dark:border-white/20 cursor-pointer accent-primary"
               />
               <span className="font-medium">Embed ID3 / Title Tags</span>
             </label>
@@ -241,7 +241,7 @@ export const FormatOptions: React.FC = () => {
                 type="checkbox"
                 checked={embedSubtitles}
                 onChange={(e) => setEmbedSubtitles(e.target.checked)}
-                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-white/20 cursor-pointer accent-primary"
+                className="w-4 h-4 rounded text-primary focus:ring-0 bg-surface border-black/20 dark:border-white/20 cursor-pointer accent-primary"
               />
               <span className="font-medium">Embed Subtitles (.srt/en)</span>
             </label>

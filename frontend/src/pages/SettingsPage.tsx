@@ -60,7 +60,7 @@ export const SettingsPage: React.FC = () => {
                   type="text"
                   value={config.download_path || ""}
                   readOnly
-                  className="flex-1 h-10 px-3.5 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl text-xs text-foreground font-mono shadow-sm"
+                  className="flex-1 h-10 px-3.5 bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 rounded-xl text-xs text-foreground font-mono shadow-sm"
                 />
                 <button
                   onClick={browseFolder}
@@ -97,10 +97,10 @@ export const SettingsPage: React.FC = () => {
                 <select
                   value={config.concurrent_downloads || 3}
                   onChange={(e) => handleUpdate({ concurrent_downloads: parseInt(e.target.value) })}
-                  className="w-full h-10 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl pl-3.5 pr-9 text-xs text-foreground font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all appearance-none cursor-pointer shadow-sm"
+                  className="w-full h-10 bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 rounded-xl pl-3.5 pr-9 text-xs text-foreground font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all appearance-none cursor-pointer shadow-sm"
                 >
                   {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-                    <option key={n} value={n} className="bg-[#10141D] text-foreground py-1">
+                    <option key={n} value={n} className="bg-white text-slate-900 dark:bg-[#10141D] dark:text-[#F8FAFC] py-1">
                       {n} Parallel Threads
                     </option>
                   ))}
@@ -120,7 +120,7 @@ export const SettingsPage: React.FC = () => {
                 type="text"
                 value={config.filename_pattern || "%(title)s.%(ext)s"}
                 onChange={(e) => handleUpdate({ filename_pattern: e.target.value })}
-                className="w-full h-10 bg-[#161C27] dark:bg-[#161C27] border border-white/12 rounded-xl px-3.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all shadow-sm"
+                className="w-full h-10 bg-white dark:bg-[#161C27] border border-black/10 dark:border-white/12 rounded-xl px-3.5 text-xs text-foreground font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all shadow-sm"
               />
               <span className="text-[11px] text-foreground-subtle mt-1.5 block">
                 Standard yt-dlp format string (e.g. <code>%(title)s.%(ext)s</code>).
