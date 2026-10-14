@@ -1,30 +1,30 @@
+"""
+StreamFlow Pro - Main Application Entrypoint
+Launches the modern desktop interface (Tauri / React + Python) or the
+Ad-Free YouTube / Music Player depending on command-line flags.
+"""
 import sys
 import subprocess
-import tkinter as tk
-from tkinter import messagebox
 import logging
+from pathlib import Path
+
+# Add project root to sys.path
+ROOT_DIR = Path(__file__).resolve().parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 # Configure logging centrally
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('downloader.log'),
+        logging.FileHandler('downloader.log', encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
 
-def install_package(package_name):
-    """Install a package via pip."""
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-        return True
-    except Exception as e:
-        logging.error(f"Failed to install {package_name}: {e}")
-        return False
-
 def check_dependencies():
-    """Check for required packages and offer to install them."""
+    """Verify required runtime dependencies."""
     missing = []
     
     try:
@@ -38,72 +38,49 @@ def check_dependencies():
         missing.append("static-ffmpeg")
 
     try:
-        import customtkinter
-    except ImportError:
-        missing.append("customtkinter")
-
-    try:
         import webview
     except ImportError:
         missing.append("pywebview")
-    
-    # Optional but recommended packages
+
     try:
-        import win10toast
-    except (ImportError, Exception):
-        logging.debug("win10toast not found - notifications will be disabled")
+        import fastapi
+    except ImportError:
+        missing.append("fastapi")
+
+    try:
+        import uvicorn
+    except ImportError:
+        missing.append("uvicorn")
 
     if missing:
-        root = tk.Tk()
-        root.withdraw()
-        msg = f"The following required packages are missing:\n{', '.join(missing)}\n\n" \
-              f"Installing them will verify 'static-ffmpeg' to handle high-quality video merging.\n" \
-              f"Do you want to install them now?"
-        
-        if messagebox.askyesno("Missing Dependencies", msg):
-            success = True
-            for pkg in missing:
-                if not install_package(pkg):
-                    messagebox.showerror("Error", f"Failed to install {pkg}")
-                    success = False
-                    break
-            
-            if success:
-                messagebox.showinfo("Success", "Dependencies installed! Starting app...")
-                return True
-            return False
+        logging.warning(f"Missing recommended packages: {', '.join(missing)}")
+        print(f"\n[!] Notice: Missing packages: {', '.join(missing)}")
+        print(f"[*] Run: pip install -r requirements.txt\n")
         return False
     
     return True
 
 def main():
-    """Main entry point for the application"""
-    if not check_dependencies():
-        return
-
-    # Initialize static-ffmpeg to add ffmpeg to PATH
+    """Main entry point for StreamFlow Pro."""
+    # Ensure static-ffmpeg is available on PATH
     try:
         import static_ffmpeg
         static_ffmpeg.add_paths()
-        logging.info("static-ffmpeg paths added.")
     except ImportError:
-        logging.warning("static-ffmpeg not found, high quality merges might fail.")
+        logging.warning("static-ffmpeg not installed; high-quality audio/video merge may fail.")
 
-    try:
-        import customtkinter as ctk
-        from gui import AdvancedDownloaderApp
-    except ImportError as e:
-        logging.error(f"Import error: {e}")
-        messagebox.showerror("Error", f"Failed to import application: {e}")
-        return
+    check_dependencies()
 
-    try:
-        root = ctk.CTk()
-        app = AdvancedDownloaderApp(root)
-        root.mainloop()
-    except Exception as e:
-        logging.error(f"Application error: {e}", exc_info=True)
-        messagebox.showerror("Error", f"Application crashed: {e}")
+    # Route based on command-line argument if provided
+    args = [a.lower() for a in sys.argv[1:]]
+    if any(arg in args for arg in ["--player", "-p", "player", "--music", "music", "youtube"]):
+        logging.info("Starting YouTube & Music Player...")
+        from utils.player_process import main as launch_player
+        launch_player()
+    else:
+        logging.info("Starting StreamFlow Pro Modern Downloader Interface...")
+        import run_modern
+        run_modern.main()
 
 if __name__ == "__main__":
     main()

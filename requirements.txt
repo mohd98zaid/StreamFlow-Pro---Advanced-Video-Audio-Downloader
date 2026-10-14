@@ -1,12 +1,8 @@
-# VideoDownloader Requirements
+# StreamFlow Pro Requirements
 yt-dlp>=2023.12.30
 static-ffmpeg>=2.5
-customtkinter>=5.2.0
 pywebview>=5.0.0
-tkinterweb>=4.25.0
-win10toast>=0.9  # Optional: Windows notifications
-pillow>=10.0.0
 fastapi>=0.110.0
 uvicorn>=0.28.0
-
-
+pillow>=10.0.0
+win10toast>=0.9  # Optional: Windows notifications

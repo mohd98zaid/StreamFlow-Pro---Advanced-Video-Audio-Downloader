@@ -35,7 +35,7 @@ StreamFlow Pro bridges the raw downloading power of Python and `yt-dlp` with the
 * **Preserved Python Core Engine:** Retains 100% of the proven multi-threaded download engine, database manager, preset engine, and event bus without breaking backward compatibility.
 * **Real-Time WebSocket Synchronization:** Instantaneous, bi-directional telemetry delivering live per-download speed, progress percentages, ETA, and queue mutations directly to the UI.
 * **Integrated Ad-Free Cinema Player:** Preview videos, music tracks, and label-restricted releases without ads or embed restrictions using the built-in Yuma Studio WebView player.
-* **Complete Backward Compatibility:** The classic Tkinter GUI and standalone player remain fully available as selectable launch targets.
+* **Dual Native Interfaces:** Launch the full-featured modern workstation downloader or jump straight into the full-screen Ad-Free YouTube & Music Player.
 
 ---
 
@@ -102,13 +102,12 @@ StreamFlow Pro includes a high-reliability Windows batch runner supporting inter
               StreamFlow Pro Suite
 ========================================================
 
-  [1] StreamFlow Pro Modern (Tauri / React + Python) [Default]
-  [2] YouTube Ad-Free Player (StreamFlow Yuma Studio)
-  [3] StreamFlow Pro Classic (Legacy Tkinter GUI)
-  [4] Exit
+  [1] YouTube & Music Player (StreamFlow Studio) [Default]
+  [2] StreamFlow Pro Modern Downloader (Tauri / React + Python)
+  [3] Exit
 
 ========================================================
-Select an option [1-4] (Default: 1): 
+Select an option [1-3] (Default: 1): 
 ```
 
 ### Command-Line Shortcuts
@@ -116,10 +115,9 @@ You can bypass the interactive menu by passing arguments directly:
 
 | Command | Action |
 | :--- | :--- |
-| `run.bat modern` or `run.bat 1` or `run.bat m` | Launches modern Tauri / React interface with Python engine |
-| `run.bat player` or `run.bat 2` or `run.bat p` | Launches standalone Ad-Free Yuma Studio Player |
-| `run.bat classic` or `run.bat 3` or `run.bat c` | Launches legacy CustomTkinter GUI |
-| `run.bat exit` or `run.bat 4` or `run.bat q` | Cleanly exits the launcher |
+| `run.bat` (Press Enter) or `run.bat player` or `run.bat 1` or `run.bat p` / `run.bat music` / `run.bat yt` | Launches standalone Ad-Free YouTube & Music Player (Default) |
+| `run.bat modern` or `run.bat 2` or `run.bat m` or `run.bat downloader` | Launches modern Tauri / React interface with Python engine |
+| `run.bat exit` or `run.bat 3` or `run.bat q` | Cleanly exits the launcher |
 
 ---
 
@@ -253,12 +251,6 @@ StreamFlow-Pro/
 │   ├── Cargo.toml                 # Cargo dependencies
 │   └── tauri.conf.json            # Window configurations & security policies
 │
-├── gui/                           # Legacy Tkinter interface (Preserved for compatibility)
-│   ├── download_tab.py            # Classic download tab
-│   ├── history_tab.py             # Classic history tab
-│   ├── queue_tab.py               # Classic queue tab
-│   └── main_window.py             # Classic main window
-│
 ├── utils/                         # Utilities & shared modules
 │   ├── player_process.py          # Chromium WebView2 Ad-Free Yuma Player
 │   ├── presets.py                 # Video and audio preset definitions
@@ -277,7 +269,7 @@ StreamFlow-Pro/
 │   └── test_*.py                  # Core engine unit tests
 │
 ├── run_modern.py                  # Modern interface launcher (Backend + WebView2)
-├── main.py                        # Legacy Tkinter application entry point
+├── main.py                        # Unified CLI & modern application entry point
 ├── run.bat                        # Interactive Windows launcher runner
 └── requirements.txt               # Python package dependencies
 ```
