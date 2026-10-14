@@ -413,14 +413,6 @@ DOCUMENT_START_ADBLOCK_JS = r"""
             if (obj.playerResponse && typeof obj.playerResponse === 'object') {
                 pruneAds(obj.playerResponse);
             }
-            if (obj.playbackTracking && typeof obj.playbackTracking === 'object') {
-                delete obj.playbackTracking.videostatsPlaybackUrl;
-                delete obj.playbackTracking.videostatsDelayplayUrl;
-                delete obj.playbackTracking.videostatsWatchtimeUrl;
-                delete obj.playbackTracking.ptrackingUrl;
-                delete obj.playbackTracking.qoeUrl;
-                delete obj.playbackTracking.atrUrl;
-            }
         }
 
         // 1. Intercept ytInitialPlayerResponse at document-start before YouTube scripts run
@@ -442,13 +434,12 @@ DOCUMENT_START_ADBLOCK_JS = r"""
             if (typeof url === 'string' && (
                 url.includes('/api/stats/ads') || 
                 url.includes('/pagead/') || 
-                url.includes('doubleclick.net') || 
-                url.includes('/ptracking')
+                url.includes('doubleclick.net')
             )) {
                 return new Response('', { status: 204, statusText: 'No Content' });
             }
             const res = await _origFetch.apply(this, args);
-            if (url && (url.includes('/youtubei/v1/player') || url.includes('/youtubei/v1/browse') || url.includes('/youtubei/v1/next'))) {
+            if (url && url.includes('/youtubei/v1/player')) {
                 try {
                     const clone = res.clone();
                     const data = await clone.json();
@@ -511,27 +502,24 @@ def setup_strict_adblock():
             "adservice.google.",
             "/api/stats/ads",
             "/pagead/",
-            "/ptracking",
-            "youtube.com/api/stats/qoe",
-            "youtube.com/youtubei/v1/att/get",
             "static.doubleclick.net",
             "ad.doubleclick.net",
             "securepubads.g.doubleclick.net",
             "googlesyndication.com",
-            "/youtubei/v1/log_event",
         )
         
         def patched_web_resource_request(self, sender, args):
             try:
                 uri = str(args.Request.Uri).lower()
-                # Do not block the actual video player or browse endpoints!
-                if not any(k in uri for k in ["/youtubei/v1/player", "/youtubei/v1/browse", "/youtubei/v1/next"]):
-                    if any(ad in uri for ad in AD_DOMAINS):
-                        empty_stream = System.IO.MemoryStream()
-                        args.Response = sender.CoreWebView2.Environment.CreateWebResourceResponse(
-                            empty_stream, 204, "No Content", "Content-Type: text/plain\r\n"
-                        )
-                        return
+                # Media chunks, attestation, and YouTube navigation APIs must NEVER be delayed or blocked
+                if any(m in uri for m in ["googlevideo.com", "/videoplayback", "/youtubei/v1/player", "/youtubei/v1/att/get", "/youtubei/v1/browse", "/youtubei/v1/next"]):
+                    return orig_request(self, sender, args)
+                if any(ad in uri for ad in AD_DOMAINS):
+                    empty_stream = System.IO.MemoryStream()
+                    args.Response = sender.CoreWebView2.Environment.CreateWebResourceResponse(
+                        empty_stream, 204, "No Content", "Content-Type: text/plain\r\n"
+                    )
+                    return
             except Exception:
                 pass
             return orig_request(self, sender, args)
@@ -1655,24 +1643,6 @@ CINEMA_JS = r"""
                 for (let i = 0; i < adKeys.length; i++) {
                     if (adKeys[i] in obj.playerResponse) delete obj.playerResponse[adKeys[i]];
                 }
-                if (obj.playerResponse.playbackTracking && typeof obj.playerResponse.playbackTracking === 'object') {
-                    delete obj.playerResponse.playbackTracking.videostatsPlaybackUrl;
-                    delete obj.playerResponse.playbackTracking.videostatsDelayplayUrl;
-                    delete obj.playerResponse.playbackTracking.videostatsWatchtimeUrl;
-                    delete obj.playerResponse.playbackTracking.ptrackingUrl;
-                    delete obj.playerResponse.playbackTracking.qoeUrl;
-                    delete obj.playerResponse.playbackTracking.atrUrl;
-                }
-            }
-
-            // Neutralize telemetry and ad playback beacons
-            if (obj.playbackTracking && typeof obj.playbackTracking === 'object') {
-                delete obj.playbackTracking.videostatsPlaybackUrl;
-                delete obj.playbackTracking.videostatsDelayplayUrl;
-                delete obj.playbackTracking.videostatsWatchtimeUrl;
-                delete obj.playbackTracking.ptrackingUrl;
-                delete obj.playbackTracking.qoeUrl;
-                delete obj.playbackTracking.atrUrl;
             }
         }
 
@@ -1704,13 +1674,12 @@ CINEMA_JS = r"""
                     if (typeof url === 'string' && (
                         url.includes('/api/stats/ads') || 
                         url.includes('/pagead/') || 
-                        url.includes('doubleclick.net') || 
-                        url.includes('/ptracking')
+                        url.includes('doubleclick.net')
                     )) {
                         return new Response('', { status: 204, statusText: 'No Content' });
                     }
                     const response = await originalFetch.apply(this, args);
-                    if (url && (url.includes('/youtubei/v1/player') || url.includes('/youtubei/v1/browse') || url.includes('/youtubei/v1/next'))) {
+                    if (url && url.includes('/youtubei/v1/player')) {
                         try {
                             const clone = response.clone();
                             const json = await clone.json();
@@ -2935,6 +2904,7 @@ CINEMA_JS = r"""
 
         function syncStudioPlayer() {
             try {
+                if (!isStudioActive) return;
                 const video = document.querySelector('video');
                 const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
                 const playPauseBtn = document.getElementById('agSmPlayPauseBtn');
@@ -3764,17 +3734,14 @@ CINEMA_JS = r"""
                 }
 
                 // 2. Auto-dismiss & remove YouTube Anti-Adblock Warning Modals
-                const antiAdblockModals = document.querySelectorAll(
-                    'ytd-enforcement-message-view-model, tp-yt-paper-dialog:has(ytd-enforcement-message-view-model), tp-yt-paper-dialog:has(#feedback), tp-yt-paper-dialog:has(yt-upsell-dialog-renderer)'
-                );
-                if (antiAdblockModals.length > 0) {
-                    antiAdblockModals.forEach(modal => {
-                        const dismissBtn = modal.querySelector('#dismiss-button button, yt-button-renderer button');
-                        if (dismissBtn && typeof dismissBtn.click === 'function') {
-                            try { dismissBtn.click(); } catch(e) {}
-                        }
-                        try { modal.remove(); } catch(e) {}
-                    });
+                const enforcement = document.querySelector('ytd-enforcement-message-view-model, yt-upsell-dialog-renderer');
+                if (enforcement) {
+                    const modal = enforcement.closest('tp-yt-paper-dialog') || enforcement;
+                    const dismissBtn = modal.querySelector('#dismiss-button button, yt-button-renderer button');
+                    if (dismissBtn && typeof dismissBtn.click === 'function') {
+                        try { dismissBtn.click(); } catch(e) {}
+                    }
+                    try { modal.remove(); } catch(e) {}
 
                     // Remove backdrops
                     const backdrops = document.querySelectorAll('tp-yt-iron-overlay-backdrop');
@@ -3797,26 +3764,44 @@ CINEMA_JS = r"""
                 }
 
                 // 3. Remove non-video promotional overlays
-                const promoOverlays = document.querySelectorAll('.ytp-ad-overlay-container, ytd-banner-promo-renderer, ytd-popup-container:has(yt-upsell-dialog-renderer)');
-                promoOverlays.forEach(el => el.remove());
+                const promo = document.querySelector('.ytp-ad-overlay-container, ytd-banner-promo-renderer');
+                if (promo) promo.remove();
 
             } catch(e) {}
         }
 
-        // Hook MutationObserver for instantaneous 0-millisecond reaction
-        const targetNode = document.documentElement || document.body;
-        const observer = new MutationObserver(() => {
-            processAdBlocker();
-        });
-        observer.observe(targetNode, {
-            attributes: true,
-            attributeFilter: ['class', 'style'],
-            childList: true,
-            subtree: true
-        });
+        // Throttled observer to prevent main-thread freezing and loading delays
+        let _adCheckScheduled = false;
+        function scheduleAdBlockCheck() {
+            if (_adCheckScheduled) return;
+            _adCheckScheduled = true;
+            requestAnimationFrame(() => {
+                _adCheckScheduled = false;
+                processAdBlocker();
+            });
+        }
 
-        // Backup high-frequency interval (40ms = 25 checks/sec)
-        setInterval(processAdBlocker, 40);
+        const targetNode = document.body || document.documentElement;
+        if (targetNode) {
+            const observer = new MutationObserver((mutations) => {
+                for (let i = 0; i < mutations.length; i++) {
+                    const m = mutations[i];
+                    if (m.type === 'attributes' || (m.target && m.target.id === 'movie_player')) {
+                        scheduleAdBlockCheck();
+                        break;
+                    }
+                }
+            });
+            observer.observe(targetNode, {
+                attributes: true,
+                attributeFilter: ['class'],
+                childList: true,
+                subtree: true
+            });
+        }
+
+        // Backup periodic interval (500ms is responsive without lagging the player)
+        setInterval(processAdBlocker, 500);
 
         // Keep active across Single Page Application (SPA) YouTube video navigations
         window.addEventListener('yt-navigate-finish', () => {
