@@ -3642,39 +3642,24 @@ CINEMA_JS = r"""
                 const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
                 const video = document.querySelector('video');
 
-                // Intercept and sanitize internal player args
-                if (player && typeof player.getConfig === 'function') {
-                    try {
-                        const cfg = player.getConfig();
-                        if (cfg && cfg.args) {
-                            cleanPlayerResponse(cfg.args);
-                        }
-                    } catch(err) {}
-                }
+                // 1. Precise in-stream ad detection:
+                // YouTube strictly adds 'ad-showing' or 'ad-interrupting' class to the movie player when an ad is playing.
+                const isAdShowing = !!(player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')));
 
-                // 1. Multi-signal detection: detects ads before or as they render
-                const hasAdClass = player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'));
-                const hasAdOverlay = !!document.querySelector(
-                    '.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-module:not([style*="display: none"]), .ytp-ad-preview-container, .ytp-ad-text, .ytp-ad-persistent-progress-bar-container'
-                );
-                const isAdState = player && typeof player.getAdState === 'function' && player.getAdState() > 0;
-                const isAdVideo = video && video.closest && !!video.closest('.ad-showing, .ad-interrupting');
-                const isAdPlaying = hasAdClass || hasAdOverlay || isAdState || isAdVideo;
-
-                if (isAdPlaying && video) {
+                if (isAdShowing && video) {
                     if (!isAdActive) {
                         isAdActive = true;
-                        if (video.playbackRate >= 0.25 && video.playbackRate <= 3.0) {
+                        if (video.playbackRate >= 0.25 && video.playbackRate <= 2.0) {
                             originalPlaybackRate = video.playbackRate;
                         }
                         originalMuted = video.muted;
                     }
 
-                    // A. Instant mute & zero volume (no audio leak)
+                    // A. Instant mute & zero volume (no audio leak during ad)
                     video.muted = true;
                     video.volume = 0;
 
-                    // B. Accelerate ad to 16x speed (HTML5 spec max)
+                    // B. Accelerate ad to 16x speed (silently finishes unskippable ads in a fraction of a second)
                     if (video.playbackRate !== 16.0) {
                         video.playbackRate = 16.0;
                     }
@@ -3684,12 +3669,7 @@ CINEMA_JS = r"""
                         try { player.skipAd(); } catch(e) {}
                     }
 
-                    // D. Instant seek to end of ad
-                    if (!isNaN(video.duration) && isFinite(video.duration) && video.duration > 0) {
-                        video.currentTime = video.duration - 0.01;
-                    }
-
-                    // E. Auto-click any skip button across light DOM and shadow roots
+                    // D. Auto-click any skip button
                     const skipSelectors = [
                         '.ytp-ad-skip-button',
                         '.ytp-ad-skip-button-modern',
@@ -3697,32 +3677,26 @@ CINEMA_JS = r"""
                         '.ytp-ad-skip-button-slot button',
                         '.ytp-ad-skip-button-container button',
                         'button[class*="ytp-ad-skip"]',
-                        '.ytp-ad-overlay-close-button',
-                        '.ytp-ad-image-overlay button',
-                        '.ytp-ad-text-overlay button',
-                        'button.ytp-ad-survey-answer'
+                        '.ytp-ad-overlay-close-button'
                     ];
-                    for (const sel of skipSelectors) {
-                        const btns = document.querySelectorAll(sel);
-                        btns.forEach(b => {
-                            if (b && typeof b.click === 'function') {
-                                try { b.click(); } catch(e) {}
-                            }
-                        });
+                    for (let i = 0; i < skipSelectors.length; i++) {
+                        const btn = document.querySelector(skipSelectors[i]);
+                        if (btn && typeof btn.click === 'function') {
+                            try { btn.click(); } catch(e) {}
+                        }
                     }
 
-                    // F. Remove ad overlays directly from DOM
+                    // E. Remove visual ad overlays
                     const adOverlays = document.querySelectorAll(
-                        '.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-overlay-container, .ytp-ad-image-overlay, .ytp-ad-text-overlay, .ytp-ad-preview-container'
+                        '.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-image-overlay, .ytp-ad-text-overlay'
                     );
                     adOverlays.forEach(ov => {
                         try { ov.remove(); } catch(e) {}
                     });
                 } else {
-                    // Normal video playing
+                    // Normal video playing - cleanly restore genuine playback rate and volume
                     if (isAdActive) {
                         isAdActive = false;
-                        // Clean restoration of user's genuine playback rate and volume
                         if (video) {
                             video.playbackRate = originalPlaybackRate || 1.0;
                             video.muted = originalMuted;
