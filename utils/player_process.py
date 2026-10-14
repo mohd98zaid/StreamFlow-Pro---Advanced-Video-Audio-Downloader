@@ -644,7 +644,8 @@ CONTROLS_CSS = """
 }
 
 #antigravity-top-controls:hover,
-#antigravity-top-controls.ag-dock-expanded {
+#antigravity-top-controls.ag-dock-expanded,
+#antigravity-top-controls.ag-dock-pinned {
     opacity: 1;
     background: rgba(15, 23, 42, 0.95);
     border-color: rgba(255, 255, 255, 0.28);
@@ -677,7 +678,7 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
     transform: translateX(-50%) translateY(-12px);
 }
 
-/* Smooth expandable actions container (collapsed by default, opens on hover) */
+/* Smooth expandable actions container (collapsed by default, opens on hover or pin) */
 .ag-dock-actions {
     display: inline-flex;
     align-items: center;
@@ -694,7 +695,8 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
 }
 
 #antigravity-top-controls:hover .ag-dock-actions,
-#antigravity-top-controls.ag-dock-expanded .ag-dock-actions {
+#antigravity-top-controls.ag-dock-expanded .ag-dock-actions,
+#antigravity-top-controls.ag-dock-pinned .ag-dock-actions {
     max-width: 900px;
     opacity: 1;
     pointer-events: auto;
@@ -725,6 +727,12 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
     transform: scale(1.03) !important;
 }
 
+#antigravity-top-controls.ag-dock-pinned .ag-toggle-btn {
+    background: rgba(245, 158, 11, 0.22) !important;
+    border-color: rgba(245, 158, 11, 0.6) !important;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.35) !important;
+}
+
 .ag-toggle-btn .ag-bolt {
     color: #f59e0b;
     font-size: 14px;
@@ -743,6 +751,20 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
     font-weight: 700;
     color: #FFFFFF;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.ag-toggle-btn .ag-chevron {
+    font-size: 11px;
+    opacity: 0.75;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: inline-block;
+}
+
+#antigravity-top-controls:hover .ag-chevron,
+#antigravity-top-controls.ag-dock-expanded .ag-chevron,
+#antigravity-top-controls.ag-dock-pinned .ag-chevron {
+    transform: rotate(180deg);
+    opacity: 1;
 }
 
 .ag-control-btn {
@@ -1867,6 +1889,10 @@ CINEMA_JS = r"""
 
         // 5. Inject Top Controls Container
         let controls = document.getElementById('antigravity-top-controls');
+        if (controls && !document.getElementById('agDockActions')) {
+            controls.remove();
+            controls = null;
+        }
         if (!controls) {
             controls = document.createElement('div');
             controls.id = 'antigravity-top-controls';
@@ -1929,15 +1955,20 @@ CINEMA_JS = r"""
             dlBtn.textContent = isMusicSite ? '🎵 Download MP3' : '⬇️ Download Video';
             dlBtn.title = isMusicSite ? 'Download 320kbps MP3 audio' : 'Download current video';
 
-            // Brand Trigger Button (⚡ StreamFlow) - Opens on hover, collapses when cursor leaves
+            // Brand Trigger Button (⚡ StreamFlow) - Opens on hover, click pins/unpins
             const minBtn = document.createElement('button');
             minBtn.className = 'ag-control-btn ag-toggle-btn';
             minBtn.id = 'agMinBtn';
-            minBtn.innerHTML = '<span class="ag-bolt">⚡</span><span class="ag-brand-text">StreamFlow</span>';
-            minBtn.title = 'StreamFlow Controls (Hover to open)';
+            minBtn.innerHTML = '<span class="ag-bolt">⚡</span><span class="ag-brand-text">StreamFlow</span><span class="ag-chevron">◀</span>';
+            minBtn.title = 'StreamFlow Actions (Hover to reveal, Click to lock/unlock all buttons)';
             minBtn.onclick = (e) => {
                 e.stopPropagation();
-                controls.classList.toggle('ag-dock-expanded');
+                const isPinned = controls.classList.toggle('ag-dock-pinned');
+                if (isPinned) {
+                    controls.classList.add('ag-dock-expanded');
+                } else {
+                    controls.classList.remove('ag-dock-expanded');
+                }
             };
 
             // Actions wrapper for smooth sliding reveal on hover
@@ -1954,6 +1985,14 @@ CINEMA_JS = r"""
             controls.appendChild(minBtn);
             controls.appendChild(actionsWrap);
             (document.body || document.documentElement).appendChild(controls);
+
+            // Peek animation on launch: smoothly unfolds for 3.2s so user sees all action buttons, then folds into pill
+            controls.classList.add('ag-dock-expanded');
+            setTimeout(() => {
+                if (!controls.classList.contains('ag-dock-pinned') && !controls.matches(':hover')) {
+                    controls.classList.remove('ag-dock-expanded');
+                }
+            }, 3200);
         }
 
         const isMusicSite = window.location.hostname.includes('music.youtube.com');
@@ -2241,14 +2280,30 @@ CINEMA_JS = r"""
         };
 
         // Controls Dock Hover & Inactivity Controller
+        let leaveDebounceTimer;
+
         controls.addEventListener('mouseenter', () => {
             isHovered = true;
+            controls.classList.add('ag-dock-expanded');
             controls.classList.remove('hidden');
             clearTimeout(hideTimer);
+            clearTimeout(leaveDebounceTimer);
+        });
+
+        controls.addEventListener('mousemove', () => {
+            if (!controls.classList.contains('ag-dock-expanded')) {
+                controls.classList.add('ag-dock-expanded');
+            }
         });
 
         controls.addEventListener('mouseleave', () => {
             isHovered = false;
+            clearTimeout(leaveDebounceTimer);
+            leaveDebounceTimer = setTimeout(() => {
+                if (!controls.classList.contains('ag-dock-pinned') && !controls.matches(':hover')) {
+                    controls.classList.remove('ag-dock-expanded');
+                }
+            }, 250);
             resetTimer();
         });
 
@@ -2266,10 +2321,12 @@ CINEMA_JS = r"""
         window.addEventListener('mousedown', resetTimer);
         resetTimer();
 
-        // Clicking outside collapses pinned dock
+        // Clicking outside collapses dock unless pinned
         document.addEventListener('click', (e) => {
             if (controls && !controls.contains(e.target)) {
-                controls.classList.remove('ag-dock-expanded');
+                if (!controls.classList.contains('ag-dock-pinned')) {
+                    controls.classList.remove('ag-dock-expanded');
+                }
             }
         });
 
