@@ -751,18 +751,25 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
 """
 
 STUDIO_MUSIC_CSS = """/* ==========================================================================
-   StreamFlow Studio - YumaPlayer Architecture (UI/UX Pro Max Edition)
+   StreamFlow Studio - Obsidian Hi-Fi Studio Architecture (Aura Canvas Edition)
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root, #antigravity-studio-music {
-    --ambient-bg: #080a12;
+    --ambient-bg: #06080e;
     --ambient-color-1: rgba(190, 90, 20, 0.45);
     --ambient-color-2: rgba(30, 64, 175, 0.45);
+    --ambient-color-3: rgba(14, 165, 233, 0.25);
     --yuma-accent: #38bdf8;
+    --yuma-accent-glow: rgba(56, 189, 248, 0.35);
     --text-main: #ffffff;
     --text-sub: rgba(255, 255, 255, 0.65);
+    --text-muted: rgba(255, 255, 255, 0.4);
+    --glass-surface: rgba(255, 255, 255, 0.04);
+    --glass-surface-hover: rgba(255, 255, 255, 0.08);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-hover: rgba(255, 255, 255, 0.18);
 }
 
 #antigravity-studio-music {
@@ -771,7 +778,7 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     width: 100% !important;
     height: 100% !important;
     z-index: 2147483640 !important;
-    background: var(--ambient-bg) !important;
+    background: radial-gradient(ellipse at 50% 0%, #0d1322 0%, #06080e 100%) !important;
     color: #ffffff !important;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     display: none;
@@ -801,7 +808,9 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     cursor: pointer;
 }
 
-/* Ambient Lighting Gradient */
+/* ==========================================================================
+   LIVING AURORA MESH BACKDROP
+   ========================================================================== */
 .ag-sm-ambient-mesh {
     position: absolute;
     inset: 0;
@@ -812,54 +821,71 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 .ag-sm-ambient-mesh::before {
     content: '';
     position: absolute;
-    width: 50vw;
-    height: 55vh;
-    top: -10%;
-    left: -5%;
-    background: radial-gradient(circle, var(--ambient-color-1) 0%, transparent 70%);
-    filter: blur(100px);
-    opacity: 0.9;
-    transition: all 1.2s ease;
+    width: 65vw;
+    height: 70vh;
+    top: -15%;
+    left: -10%;
+    background: radial-gradient(circle, var(--ambient-color-1) 0%, transparent 65%);
+    filter: blur(120px);
+    opacity: 0.85;
+    animation: agAuroraFloat1 22s ease-in-out infinite alternate;
+    transition: background 1.5s ease, opacity 1.5s ease;
 }
 .ag-sm-ambient-mesh::after {
     content: '';
     position: absolute;
-    width: 45vw;
-    height: 50vh;
-    bottom: -5%;
-    right: 5%;
-    background: radial-gradient(circle, var(--ambient-color-2) 0%, transparent 70%);
-    filter: blur(110px);
-    opacity: 0.8;
-    transition: all 1.2s ease;
+    width: 60vw;
+    height: 65vh;
+    bottom: -10%;
+    right: -5%;
+    background: radial-gradient(circle, var(--ambient-color-2) 0%, transparent 65%);
+    filter: blur(130px);
+    opacity: 0.75;
+    animation: agAuroraFloat2 26s ease-in-out infinite alternate;
+    transition: background 1.5s ease, opacity 1.5s ease;
 }
 
-/* Custom Scrollbars */
+@keyframes agAuroraFloat1 {
+    0% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(6vw, 4vh) scale(1.08); }
+    100% { transform: translate(-4vw, 8vh) scale(0.96); }
+}
+
+@keyframes agAuroraFloat2 {
+    0% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-7vw, -5vh) scale(1.12); }
+    100% { transform: translate(3vw, -8vh) scale(0.95); }
+}
+
+/* Scoped Scrollbars */
 #antigravity-studio-music ::-webkit-scrollbar {
     width: 5px;
+    height: 5px;
 }
 #antigravity-studio-music ::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.12);
-    border-radius: 4px;
+    border-radius: 9999px;
 }
 #antigravity-studio-music ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.25);
 }
 #antigravity-studio-music ::-webkit-scrollbar-track {
     background: transparent;
 }
 
-/* TOP NAVIGATION BAR */
+/* ==========================================================================
+   TOP NAVIGATION BAR
+   ========================================================================== */
 .ag-sm-header {
     height: 54px;
-    background: rgba(9, 12, 20, 0.6);
-    backdrop-filter: blur(32px) saturate(160%);
-    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    background: rgba(8, 11, 20, 0.65);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 24px;
     z-index: 50;
     position: relative;
     flex-shrink: 0;
@@ -868,7 +894,7 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 .ag-sm-header-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
 }
 
 .ag-sm-brand {
@@ -885,13 +911,13 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 }
 .ag-sm-brand-icon span {
     width: 2.5px;
-    background: linear-gradient(to top, #38bdf8, #818cf8);
+    background: linear-gradient(to top, var(--yuma-accent), #c084fc);
     border-radius: 2px;
     animation: agEqDance 1.2s ease-in-out infinite alternate;
 }
 .ag-sm-brand-icon span:nth-child(1) { height: 8px; animation-delay: 0.1s; }
 .ag-sm-brand-icon span:nth-child(2) { height: 16px; animation-delay: 0.3s; }
-.ag-sm-brand-icon span:nth-child(3) { height: 13px; animation-delay: 0.2s; }
+.ag-sm-brand-icon span:nth-child(3) { height: 12px; animation-delay: 0.2s; }
 .ag-sm-brand-icon span:nth-child(4) { height: 18px; animation-delay: 0.4s; }
 .ag-sm-brand-icon span:nth-child(5) { height: 7px; animation-delay: 0.15s; }
 
@@ -902,9 +928,19 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 
 .ag-sm-brand-text {
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 800;
     color: #ffffff;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.4px;
+}
+.ag-sm-brand-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 9999px;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: #7dd3fc;
+    letter-spacing: 0.6px;
 }
 
 .ag-sm-header-center {
@@ -914,23 +950,23 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 }
 
 .ag-sm-search-capsule {
-    width: 380px;
-    height: 34px;
+    width: 420px;
+    height: 36px;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 9999px;
     display: flex;
     align-items: center;
     padding: 0 16px;
     gap: 10px;
     backdrop-filter: blur(16px);
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .ag-sm-search-capsule:focus-within {
-    border-color: rgba(255, 255, 255, 0.28);
+    border-color: rgba(56, 189, 248, 0.5);
     background: rgba(255, 255, 255, 0.09);
-    box-shadow: 0 0 16px rgba(255, 255, 255, 0.08);
-    width: 420px;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+    width: 480px;
 }
 .ag-sm-search-capsule svg {
     color: #94a3b8;
@@ -941,7 +977,7 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     border: none;
     outline: none;
     color: #ffffff;
-    font-size: 12.5px;
+    font-size: 13px;
     width: 100%;
     font-family: inherit;
 }
@@ -960,19 +996,20 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #ffffff;
     border-radius: 9999px;
-    padding: 6px 14px;
-    font-size: 11.5px;
+    padding: 7px 15px;
+    font-size: 12px;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     cursor: pointer;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(14px);
     transition: all 0.2s ease;
 }
 .ag-sm-hdr-btn:hover {
     background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
 }
 .ag-sm-hdr-video {
     background: rgba(56, 189, 248, 0.12);
@@ -982,13 +1019,14 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 .ag-sm-hdr-video:hover {
     background: rgba(56, 189, 248, 0.24);
     color: #ffffff;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
 }
 .ag-sm-hdr-icon-btn {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.09);
     color: #94a3b8;
     display: flex;
     align-items: center;
@@ -998,11 +1036,14 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     transition: all 0.2s ease;
 }
 .ag-sm-hdr-icon-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.14);
     color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.22);
 }
 
-/* MAIN CONTENT STAGE */
+/* ==========================================================================
+   MAIN CONTENT STAGE
+   ========================================================================== */
 .ag-sm-content-stage {
     flex: 1;
     display: flex;
@@ -1011,152 +1052,286 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     z-index: 10;
 }
 
-/* =========================================================================
-   LEFT COLUMN: PROPORTIONAL YUMA FULL PLAYER
-   ========================================================================= */
+/* ==========================================================================
+   LEFT COLUMN: MASTER OBSIDIAN HI-FI CONSOLE DECK
+   ========================================================================== */
 .ag-sm-left-player {
-    width: 420px;
+    width: clamp(440px, 34vw, 520px);
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 14px 30px 12px 30px;
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(8, 10, 18, 0.45);
-    backdrop-filter: blur(36px);
-    -webkit-backdrop-filter: blur(36px);
-    overflow: hidden;
+    padding: 20px 28px 18px 28px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(13, 17, 28, 0.72) 0%, rgba(8, 10, 18, 0.88) 100%);
+    backdrop-filter: blur(45px);
+    -webkit-backdrop-filter: blur(45px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    gap: 12px;
 }
 
+/* Artwork & Vinyl Disc Presentation */
 .ag-sm-art-wrap {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 0;
-    margin: 2px 0 8px 0;
-}
-.ag-sm-art-img {
-    width: clamp(160px, 30vh, 220px);
-    height: clamp(160px, 30vh, 220px);
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    border-radius: 26px;
-    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.8), 0 0 45px var(--ambient-color-1);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    transition: transform 0.3s ease;
-}
-.ag-sm-art-wrap:hover .ag-sm-art-img {
-    transform: scale(1.02);
+    min-height: 240px;
+    position: relative;
+    padding: 8px 16px;
 }
 
+.ag-sm-art-container {
+    position: relative;
+    width: clamp(220px, 32vh, 300px);
+    height: clamp(220px, 32vh, 300px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Vinyl Record Disc */
+.ag-sm-vinyl-disc {
+    position: absolute;
+    width: 92%;
+    height: 92%;
+    border-radius: 50%;
+    right: 4px;
+    top: 4%;
+    background: radial-gradient(circle at center, #0f0f13 0%, #17181f 18%, #101014 20%, #1f2029 35%, #0f0f13 37%, #252631 52%, #111217 54%, #20212a 70%, #0d0e12 72%, #262734 88%, #090a0d 100%);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.8), inset 0 0 2px rgba(255, 255, 255, 0.3);
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), right 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+}
+.ag-sm-vinyl-grooves {
+    position: absolute;
+    inset: 4%;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 0 0 12px rgba(255, 255, 255, 0.015), inset 0 0 0 24px rgba(255, 255, 255, 0.02);
+}
+.ag-sm-vinyl-label {
+    width: 34%;
+    height: 34%;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--yuma-accent) 0%, #1e1b4b 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.6), inset 0 0 4px rgba(255, 255, 255, 0.3);
+}
+.ag-sm-vinyl-hole {
+    width: 22%;
+    height: 22%;
+    border-radius: 50%;
+    background: #080a12;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Vinyl Slides Out & Rotates While Playing */
+.ag-sm-art-wrap.is-playing .ag-sm-vinyl-disc {
+    right: -24px;
+    animation: agSpinVinyl 12s linear infinite;
+}
+
+@keyframes agSpinVinyl {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Artwork Sleeve */
+.ag-sm-art-sleeve {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 22px;
+    overflow: hidden;
+    z-index: 2;
+    box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.85), 0 0 45px -8px var(--ambient-color-1);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: #0a0d17;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.ag-sm-art-container:hover .ag-sm-art-sleeve {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 30px 70px -10px rgba(0, 0, 0, 0.9), 0 0 55px -4px var(--ambient-color-1);
+}
+.ag-sm-art-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 22px;
+}
+.ag-sm-art-gloss {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.25) 100%);
+    pointer-events: none;
+    border-radius: 22px;
+}
+
+/* Metadata & Details Row */
 .ag-sm-info-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    gap: 12px;
     flex-shrink: 0;
 }
 .ag-sm-info-text {
     flex: 1;
     min-width: 0;
-    padding-right: 14px;
 }
 .ag-sm-hero-title {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: clamp(20px, 2.3vh, 26px);
+    font-weight: 800;
     color: #ffffff;
-    line-height: 1.2;
+    line-height: 1.25;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.4px;
+}
+.ag-sm-hero-artist-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
 }
 .ag-sm-hero-artist {
-    font-size: 13.5px;
+    font-size: 14.5px;
     font-weight: 500;
-    color: var(--text-sub);
-    margin-top: 3px;
+    color: #94a3b8;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
 .ag-sm-heart-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.09);
     color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.2s ease, color 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     flex-shrink: 0;
+    backdrop-filter: blur(12px);
 }
-.ag-sm-heart-btn:hover, .ag-sm-heart-btn.liked {
+.ag-sm-heart-btn:hover {
+    background: rgba(236, 72, 153, 0.15);
+    border-color: rgba(236, 72, 153, 0.4);
     color: #ec4899;
-    transform: scale(1.15);
+    transform: scale(1.08);
+}
+.ag-sm-heart-btn.liked, .ag-sm-heart-btn.active {
+    background: rgba(236, 72, 153, 0.2);
+    border-color: rgba(236, 72, 153, 0.5);
+    color: #ec4899;
 }
 
-/* Seekbar */
-.ag-sm-seek-wrap {
-    margin-bottom: 6px;
-    flex-shrink: 0;
-}
-.ag-sm-slider {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 4.5px;
-    border-radius: 9999px;
-    background: linear-gradient(to right, #ffffff 28%, rgba(255, 255, 255, 0.18) 28%);
-    outline: none;
-    cursor: pointer;
-    transition: height 0.15s ease;
-}
-.ag-sm-slider:hover {
-    height: 6px;
-}
-.ag-sm-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    background: #ffffff;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-    cursor: pointer;
-}
-
-.ag-sm-meta-row {
+/* Hi-Fi Lossless DAC Capsule */
+.ag-sm-hifi-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-sub);
-    font-variant-numeric: tabular-nums;
-    margin-bottom: 10px;
+    justify-content: center;
     flex-shrink: 0;
 }
 .ag-sm-badge-capsule {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 3px 12px;
+    gap: 8px;
+    padding: 5px 16px;
     border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
     font-size: 10.5px;
-    font-weight: 600;
+    font-weight: 700;
     color: rgba(255, 255, 255, 0.85);
-    letter-spacing: 0.4px;
+    letter-spacing: 0.6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+.ag-sm-dac-led {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 10px #10b981;
+    animation: agLedPulse 2s ease-in-out infinite;
+    flex-shrink: 0;
 }
 
-/* Floating Transport Capsule */
+@keyframes agLedPulse {
+    0%, 100% { opacity: 0.7; transform: scale(0.95); }
+    50% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 14px #34d399; }
+}
+
+/* Continuous Seekbar & Timestamps */
+.ag-sm-seek-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.ag-sm-seek-wrap {
+    width: 100%;
+}
+.ag-sm-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 5px;
+    border-radius: 9999px;
+    background: linear-gradient(to right, #38bdf8 0%, #818cf8 28%, rgba(255, 255, 255, 0.15) 28%);
+    outline: none;
+    cursor: pointer;
+    transition: height 0.15s ease;
+}
+.ag-sm-slider:hover {
+    height: 7px;
+}
+.ag-sm-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.ag-sm-slider:hover::-webkit-slider-thumb {
+    transform: scale(1.2);
+}
+
+.ag-sm-timestamps {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-sub);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Floating Tactile Transport Capsule */
 .ag-sm-transport-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
     flex-shrink: 0;
 }
 .ag-sm-flank-btn {
@@ -1166,12 +1341,22 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     align-items: center;
     justify-content: center;
     transition: color 0.2s ease, transform 0.2s ease;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
 }
 .ag-sm-flank-btn:hover {
     color: #ffffff;
-    transform: scale(1.12);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.16);
+    transform: scale(1.08);
+}
+.ag-sm-flank-btn.active {
+    color: var(--yuma-accent);
+    background: rgba(56, 189, 248, 0.15);
+    border-color: rgba(56, 189, 248, 0.35);
 }
 
 .ag-sm-transport-capsule {
@@ -1179,13 +1364,13 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     align-items: center;
     justify-content: center;
     gap: 22px;
-    background: rgba(255, 255, 255, 0.16);
-    backdrop-filter: blur(32px);
-    -webkit-backdrop-filter: blur(32px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(36px);
+    -webkit-backdrop-filter: blur(36px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 9999px;
-    padding: 5px 24px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    padding: 6px 26px;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 .ag-sm-trans-btn {
     color: #ffffff;
@@ -1193,13 +1378,14 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.18s ease;
+    transition: transform 0.18s ease, color 0.18s ease;
 }
 .ag-sm-trans-btn:hover {
     transform: scale(1.15);
+    color: var(--yuma-accent);
 }
 
-/* PURE SOLID WHITE CIRCULAR PLAY BUTTON (YUMA SIGNATURE) */
+/* PURE SOLID WHITE CIRCULAR PLAY BUTTON (YUMA MASTER SIGNATURE) */
 #antigravity-studio-music .ag-sm-play-circle {
     width: 52px !important;
     height: 52px !important;
@@ -1207,7 +1393,7 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     background: #ffffff !important;
     color: #080a12 !important;
     border: none !important;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 16px rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45), 0 0 24px rgba(255, 255, 255, 0.5) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -1220,49 +1406,125 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 }
 #antigravity-studio-music .ag-sm-play-circle:hover {
     transform: scale(1.08) !important;
-    box-shadow: 0 8px 28px rgba(255, 255, 255, 0.65) !important;
+    box-shadow: 0 8px 30px rgba(255, 255, 255, 0.75) !important;
 }
 #antigravity-studio-music .ag-sm-play-circle:active {
     transform: scale(0.95) !important;
 }
 
-.ag-sm-bottom-bar {
+/* Deck Bottom Utility Row (Volume + Download Pill) */
+.ag-sm-deck-utilities {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 26px;
+    gap: 12px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
     flex-shrink: 0;
-    padding: 0 4px;
 }
+
+.ag-sm-vol-cluster {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 9999px;
+    padding: 4px 12px;
+}
+.ag-sm-vol-btn {
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease;
+}
+.ag-sm-vol-btn:hover {
+    color: #ffffff;
+}
+.ag-sm-vol-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 65px;
+    height: 4px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+    cursor: pointer;
+}
+.ag-sm-vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+}
+
+.ag-sm-deck-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ag-sm-hero-dl-btn {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    border-radius: 9999px;
+    padding: 7px 16px;
+    font-size: 11.5px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ag-sm-hero-dl-btn:hover {
+    background: #ffffff;
+    color: #080a12;
+    border-color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.25);
+}
+.ag-sm-hero-dl-btn:hover svg {
+    color: #080a12;
+    stroke: #080a12;
+}
+
 .ag-sm-sheet-btn {
     color: rgba(255, 255, 255, 0.65);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s ease, transform 0.2s ease;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: color 0.2s ease, transform 0.2s ease, background 0.2s ease;
 }
 .ag-sm-sheet-btn:hover {
     color: #ffffff;
-    transform: scale(1.12);
-}
-.ag-sm-drag-handle {
-    width: 44px;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.28);
-    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(1.08);
 }
 
-/* =========================================================================
-   RIGHT COLUMN: YUMA QUICK PICKS & QUEUE
+/* ==========================================================================
+   RIGHT COLUMN: SMART RECOMMENDATIONS & QUEUE
    ========================================================================= */
 .ag-sm-right-stage {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    padding: 16px 26px 20px 26px;
-    gap: 14px;
+    padding: 20px 32px 24px 32px;
+    gap: 16px;
 }
 
 /* Mood Filter Chips */
@@ -1278,30 +1540,31 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 6px 18px;
+    padding: 7px 20px;
     border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.09);
     color: rgba(255, 255, 255, 0.75);
     font-size: 12px;
     font-weight: 600;
     line-height: 1.2;
     cursor: pointer;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(14px);
     white-space: nowrap;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 #antigravity-studio-music .ag-sm-chip:hover {
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.12);
     color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
 }
 #antigravity-studio-music .ag-sm-chip.active {
     background: #ffffff !important;
     color: #080a12 !important;
     border-color: #ffffff !important;
-    font-weight: 700;
-    box-shadow: 0 2px 14px rgba(255, 255, 255, 0.3) !important;
+    font-weight: 800;
+    box-shadow: 0 4px 18px rgba(255, 255, 255, 0.35) !important;
 }
 
 .ag-sm-sec-header {
@@ -1311,13 +1574,13 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     margin-bottom: 2px;
 }
 .ag-sm-sec-title {
-    font-size: 18px;
-    font-weight: 700;
+    font-size: 19px;
+    font-weight: 800;
     color: #ffffff;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.4px;
 }
 .ag-sm-sec-sub {
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 500;
     color: var(--text-sub);
 }
@@ -1326,64 +1589,78 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 .ag-sm-queue-list {
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: 8px;
 }
 
 .ag-sm-card {
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 8px 14px;
-    border-radius: 14px;
+    padding: 9px 16px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.035);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(16px);
+    backdrop-filter: blur(20px);
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
 }
 .ag-sm-card:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.16);
     transform: translateX(4px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
 .ag-sm-card.active-playing {
-    background: rgba(56, 189, 248, 0.08);
-    border-color: rgba(56, 189, 248, 0.35);
-    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.15), 0 4px 20px rgba(56, 189, 248, 0.18), 0 4px 16px rgba(0, 0, 0, 0.35);
-    animation: agActiveCardPulse 2.8s ease-in-out infinite;
-    position: relative;
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.12) 0%, rgba(255, 255, 255, 0.03) 100%);
+    border-color: rgba(56, 189, 248, 0.38);
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.18), 0 6px 24px rgba(56, 189, 248, 0.18), 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 .ag-sm-card.active-playing::before {
     content: '';
     position: absolute;
     left: 0;
-    top: 20%;
-    bottom: 20%;
-    width: 3px;
+    top: 15%;
+    bottom: 15%;
+    width: 3.5px;
     background: var(--yuma-accent);
     border-radius: 0 3px 3px 0;
-    box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.9);
 }
 
-@keyframes agActiveCardPulse {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.15), 0 4px 20px rgba(56, 189, 248, 0.18), 0 4px 16px rgba(0, 0, 0, 0.35); }
-    50% { box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.28), 0 6px 28px rgba(56, 189, 248, 0.32), 0 4px 16px rgba(0, 0, 0, 0.35); }
+.ag-sm-card-index {
+    width: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
-
-@media (prefers-reduced-motion: reduce) {
-    .ag-sm-card.active-playing { animation: none !important; }
-    .ag-sm-brand-icon span { animation: none !important; }
-    .ag-sm-ambient-mesh::before, .ag-sm-ambient-mesh::after { transition: none !important; }
+.ag-sm-card-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.35);
+    font-variant-numeric: tabular-nums;
+}
+.ag-sm-card-hover-play {
+    display: none;
+    color: #ffffff;
+}
+.ag-sm-card:hover .ag-sm-card-num {
+    display: none;
+}
+.ag-sm-card:hover .ag-sm-card-hover-play {
+    display: flex;
 }
 
 .ag-sm-card-thumb {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
     overflow: hidden;
     flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    background: #0f121d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .ag-sm-card-thumb img {
     width: 100%;
@@ -1396,23 +1673,26 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     min-width: 0;
 }
 .ag-sm-card-title {
-    font-size: 13.5px;
+    font-size: 14px;
     font-weight: 600;
     color: #ffffff;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: 0.1px;
-    line-height: 1.4;
+    letter-spacing: -0.2px;
+    line-height: 1.35;
+}
+.ag-sm-card.active-playing .ag-sm-card-title {
+    color: #7dd3fc;
 }
 .ag-sm-card-artist {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--text-sub);
     margin-top: 2px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .ag-sm-card-meta {
@@ -1422,25 +1702,26 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     flex-shrink: 0;
 }
 .ag-sm-card-dur {
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--text-sub);
     font-variant-numeric: tabular-nums;
 }
 
-/* Tactile Pill Download Button */
+/* Tactile Pill Download Button in Cards */
 .ag-sm-card-dl-btn {
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #ffffff;
     border-radius: 9999px;
-    padding: 5px 12px;
+    padding: 5px 13px;
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     gap: 5px;
+    backdrop-filter: blur(10px);
     transition: all 0.18s ease;
 }
 .ag-sm-card-dl-btn svg {
@@ -1455,22 +1736,23 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 }
 .ag-sm-card-dl-btn:hover svg {
     color: #080a12;
+    stroke: #080a12;
     transform: translateY(1px);
 }
 
 /* EQUALIZER DRAWER SHEET */
 .ag-sm-eq-drawer {
     display: none;
-    background: rgba(12, 16, 28, 0.92);
+    background: rgba(12, 16, 28, 0.94);
     backdrop-filter: blur(36px) saturate(160%);
     -webkit-backdrop-filter: blur(36px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 20px;
-    padding: 14px 18px;
+    padding: 16px 20px;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 .ag-sm-eq-drawer.open {
     display: flex !important;
@@ -1484,29 +1766,29 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 .ag-sm-eq-group {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
 }
 .ag-sm-eq-label {
-    font-size: 9.5px;
+    font-size: 10px;
     font-weight: 700;
     color: #94a3b8;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
 }
 .ag-sm-eq-chip {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: #cbd5e1;
-    border-radius: 6px;
-    padding: 3px 8px;
-    font-size: 10px;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
     font-weight: 600;
     cursor: pointer;
     backdrop-filter: blur(10px);
     transition: all 0.18s ease;
 }
 .ag-sm-eq-chip:hover {
-    background: rgba(255, 255, 255, 0.10);
-    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.18);
     color: #ffffff;
 }
 .ag-sm-eq-chip.active {
@@ -1518,61 +1800,59 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 .ag-sm-eq-sliders {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 6px 0;
+    gap: 14px;
+    padding: 8px 0;
 }
 .ag-sm-band {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     flex: 1;
 }
 .ag-sm-band-name {
-    font-size: 9.5px;
+    font-size: 10px;
     color: #94a3b8;
     font-weight: 600;
 }
 .ag-sm-band-slider {
     -webkit-appearance: none;
     width: 100%;
-    height: 3px;
-    border-radius: 1.5px;
-    background: rgba(255, 255, 255, 0.12);
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.14);
     outline: none;
     cursor: pointer;
 }
 .ag-sm-band-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 10px;
-    height: 10px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     background: #ffffff;
     box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
     cursor: pointer;
 }
 .ag-sm-band-val {
-    font-size: 9px;
+    font-size: 9.5px;
     color: #64748b;
     font-variant-numeric: tabular-nums;
 }
 
-/* =========================================================================
-   SKELETON LOADING STATE (shown while recommendations are fetching)
-   ========================================================================= */
+/* Skeleton Loading State */
 .ag-sm-skeleton-card {
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 8px 14px;
-    border-radius: 14px;
+    padding: 9px 16px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.025);
     border: 1px solid rgba(255, 255, 255, 0.04);
 }
 .ag-sm-skel-thumb {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.08);
     flex-shrink: 0;
     animation: agSkeletonShimmer 1.6s ease-in-out infinite;
@@ -1581,58 +1861,46 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: 8px;
 }
 .ag-sm-skel-line {
-    height: 10px;
+    height: 11px;
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.07);
     animation: agSkeletonShimmer 1.6s ease-in-out infinite;
 }
 .ag-sm-skel-line:nth-child(1) { width: 72%; animation-delay: 0s; }
-.ag-sm-skel-line:nth-child(2) { width: 50%; animation-delay: 0.15s; }
+.ag-sm-skel-line:nth-child(2) { width: 48%; animation-delay: 0.15s; }
 
 @keyframes agSkeletonShimmer {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.85; }
 }
 
-/* Right pane scoped scrollbar */
-.ag-sm-right-stage::-webkit-scrollbar { width: 4px; }
-.ag-sm-right-stage::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-}
-.ag-sm-right-stage::-webkit-scrollbar-thumb:hover {
-    background: rgba(56, 189, 248, 0.35);
-}
-.ag-sm-right-stage::-webkit-scrollbar-track { background: transparent; }
-
-/* Smooth ambient color transitions */
-.ag-sm-ambient-mesh::before {
-    transition: background 1.5s ease, opacity 1.5s ease !important;
-}
-.ag-sm-ambient-mesh::after {
-    transition: background 1.5s ease, opacity 1.5s ease !important;
-}
-
-/* Live EQ Bars for active card */
+/* Live Equalizer Bars for Active Playing Card */
 .ag-sm-live-eq {
     display: flex;
     align-items: flex-end;
-    gap: 2px;
+    gap: 2.5px;
     height: 16px;
 }
 .ag-sm-live-eq span {
-    width: 3px;
+    width: 2.5px;
     background: var(--yuma-accent);
     border-radius: 2px;
     animation: agEqDance 0.8s ease-in-out infinite alternate;
 }
-.ag-sm-live-eq span:nth-child(1) { height: 8px; animation-delay: 0s; }
-.ag-sm-live-eq span:nth-child(2) { height: 14px; animation-delay: 0.15s; }
-.ag-sm-live-eq span:nth-child(3) { height: 10px; animation-delay: 0.07s; }
-.ag-sm-live-eq span:nth-child(4) { height: 16px; animation-delay: 0.22s; }
+.ag-sm-live-eq span:nth-child(1) { height: 7px; animation-delay: 0s; }
+.ag-sm-live-eq span:nth-child(2) { height: 15px; animation-delay: 0.2s; }
+.ag-sm-live-eq span:nth-child(3) { height: 10px; animation-delay: 0.1s; }
+.ag-sm-live-eq span:nth-child(4) { height: 16px; animation-delay: 0.3s; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ag-sm-ambient-mesh::before, .ag-sm-ambient-mesh::after { animation: none !important; }
+    .ag-sm-vinyl-disc { animation: none !important; }
+    .ag-sm-brand-icon span, .ag-sm-live-eq span { animation: none !important; }
+    .ag-sm-dac-led { animation: none !important; }
+}
 """
 
 CINEMA_JS = r"""
@@ -2243,7 +2511,7 @@ CINEMA_JS = r"""
             studioUI = document.createElement('div');
             studioUI.id = 'antigravity-studio-music';
             setSafeHTML(studioUI, `
-                <!-- YUMA AMBIENT MESH BACKDROP -->
+                <!-- LIVING AURORA MESH BACKDROP -->
                 <div id="agSmAmbientMesh" class="ag-sm-ambient-mesh"></div>
 
                 <!-- TOP HEADER -->
@@ -2253,14 +2521,15 @@ CINEMA_JS = r"""
                             <div class="ag-sm-brand-icon">
                                 <span></span><span></span><span></span><span></span><span></span>
                             </div>
-                            <span class="ag-sm-brand-text">StreamFlow Yuma</span>
+                            <span class="ag-sm-brand-text">StreamFlow Studio</span>
+                            <span class="ag-sm-brand-badge">HI-RES AUDIO</span>
                         </div>
                     </div>
 
                     <div class="ag-sm-header-center">
                         <div class="ag-sm-search-capsule">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                            <input type="text" id="agSmSearchInput" placeholder="Search songs, artists, albums..." autocomplete="off">
+                            <input type="text" id="agSmSearchInput" placeholder="Search songs, artists, albums, or paste YouTube link..." autocomplete="off">
                         </div>
                     </div>
 
@@ -2281,42 +2550,62 @@ CINEMA_JS = r"""
                     </div>
                 </header>
 
-                <!-- TWO-COLUMN YUMA CONTENT STAGE -->
+                <!-- TWO-COLUMN CONTENT STAGE -->
                 <div class="ag-sm-content-stage">
-                    <!-- LEFT: YUMA FULL PLAYER (1:1 with yuma_fullplayer.png) -->
+                    <!-- LEFT: MASTER OBSIDIAN HI-FI CONSOLE DECK -->
                     <div class="ag-sm-left-player">
-                        <!-- Cover Artwork -->
+                        <!-- Cover Artwork & Vinyl Showcase -->
                         <div class="ag-sm-art-wrap" id="agSmHeroStage">
-                            <img class="ag-sm-art-img" id="agSmHeroArtImg" src="${STUDIO_ASSETS.hero_art}" alt="Cover">
+                            <div class="ag-sm-art-container">
+                                <div class="ag-sm-vinyl-disc" id="agSmVinylDisc">
+                                    <div class="ag-sm-vinyl-grooves"></div>
+                                    <div class="ag-sm-vinyl-label">
+                                        <div class="ag-sm-vinyl-hole"></div>
+                                    </div>
+                                </div>
+                                <div class="ag-sm-art-sleeve">
+                                    <img class="ag-sm-art-img" id="agSmHeroArtImg" src="${STUDIO_ASSETS.hero_art}" alt="Cover">
+                                    <div class="ag-sm-art-gloss"></div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Title, Artist, Heart -->
                         <div class="ag-sm-info-row">
                             <div class="ag-sm-info-text">
-                                <div class="ag-sm-hero-title" id="agSmHeroTitle" style="color:rgba(255,255,255,0.35);font-size:15px;font-weight:500">Play a track to begin</div>
-                                <div class="ag-sm-hero-artist" id="agSmHeroArtist" style="color:rgba(255,255,255,0.2)">StreamFlow Yuma</div>
+                                <div class="ag-sm-hero-title" id="agSmHeroTitle" style="color:rgba(255,255,255,0.45);font-size:16px;font-weight:600">Select a song to start listening</div>
+                                <div class="ag-sm-hero-artist-wrap">
+                                    <span class="ag-sm-hero-artist" id="agSmHeroArtist" style="color:rgba(255,255,255,0.3)">StreamFlow Studio Hi-Fi</span>
+                                </div>
                             </div>
                             <button class="ag-sm-heart-btn" id="agSmHeroHeartBtn" title="Like Track">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                             </button>
                         </div>
 
-                        <!-- Continuous Seekbar -->
-                        <div class="ag-sm-seek-wrap">
-                            <input type="range" class="ag-sm-slider" id="agSmSlider" min="0" max="100" value="28">
+                        <!-- Hi-Fi Lossless DAC Badge -->
+                        <div class="ag-sm-hifi-row">
+                            <div class="ag-sm-badge-capsule" id="agSmHiFiPill">
+                                <span class="ag-sm-dac-led"></span>
+                                <span class="ag-sm-dac-text">MASTER HI-RES &bull; 24-BIT / 96.0 kHz &bull; LOSSLESS FLAC</span>
+                            </div>
                         </div>
 
-                        <!-- Timestamps & FLAC Badge -->
-                        <div class="ag-sm-meta-row">
-                            <span id="agSmCurrentTime">0:47</span>
-                            <div class="ag-sm-badge-capsule" id="agSmHiFiPill">FLAC | 24-bit / 96.0 kHz</div>
-                            <span id="agSmDuration">3:47</span>
+                        <!-- Continuous Seekbar & Timestamps -->
+                        <div class="ag-sm-seek-section">
+                            <div class="ag-sm-seek-wrap">
+                                <input type="range" class="ag-sm-slider" id="agSmSlider" min="0" max="100" value="0">
+                            </div>
+                            <div class="ag-sm-timestamps">
+                                <span id="agSmCurrentTime">0:00</span>
+                                <span id="agSmDuration">0:00</span>
+                            </div>
                         </div>
 
                         <!-- Floating Transport Capsule -->
                         <div class="ag-sm-transport-row">
                             <button class="ag-sm-flank-btn" id="agSmShuffleBtn" title="Shuffle">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
                             </button>
 
                             <div class="ag-sm-transport-capsule">
@@ -2324,7 +2613,7 @@ CINEMA_JS = r"""
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                                 </button>
                                 <button class="ag-sm-play-circle" id="agSmPlayPauseBtn" title="Play / Pause">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#080a12"><polygon points="6 4 20 12 6 20 6 4"/></svg>
                                 </button>
                                 <button class="ag-sm-trans-btn" id="agSmNextBtn" title="Next">
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
@@ -2332,23 +2621,34 @@ CINEMA_JS = r"""
                             </div>
 
                             <button class="ag-sm-flank-btn" id="agSmRepeatBtn" title="Repeat">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
                             </button>
                         </div>
 
-                        <!-- Bottom Sheet Bar -->
-                        <div class="ag-sm-bottom-bar">
-                            <button class="ag-sm-sheet-btn" id="agSmLyricsBtn" title="Lyrics">
-                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                            </button>
-                            <div class="ag-sm-drag-handle"></div>
-                            <button class="ag-sm-sheet-btn" id="agSmHeroDlBtn" title="Download Audio">
-                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            </button>
+                        <!-- Deck Bottom Utility Row (Volume + Lossless MP3 Download + Lyrics) -->
+                        <div class="ag-sm-deck-utilities">
+                            <div class="ag-sm-vol-cluster">
+                                <button class="ag-sm-vol-btn" id="agSmMuteBtn" title="Mute / Unmute">
+                                    <span id="agSmVolIconWrap">
+                                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                                    </span>
+                                </button>
+                                <input type="range" class="ag-sm-vol-slider" id="agSmVolSlider" min="0" max="100" value="100" title="Volume">
+                            </div>
+
+                            <div class="ag-sm-deck-actions">
+                                <button class="ag-sm-hero-dl-btn" id="agSmHeroDlBtn" title="Download High-Quality MP3">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    <span>Download MP3</span>
+                                </button>
+                                <button class="ag-sm-sheet-btn" id="agSmLyricsBtn" title="Lyrics">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- RIGHT: YUMA QUICK PICKS & QUEUE (1:1 with yuma_main.png) -->
+                    <!-- RIGHT: SMART RECOMMENDATIONS & UP NEXT QUEUE -->
                     <div class="ag-sm-right-stage">
                         <!-- Sound Equalizer Drawer -->
                         <div class="ag-sm-eq-drawer" id="agSmEqDrawer">
@@ -2390,6 +2690,10 @@ CINEMA_JS = r"""
                         <!-- Up Next Cards List -->
                         <div class="ag-sm-queue-list" id="agSmRelatedList">
                             <div class="ag-sm-card active-playing">
+                                <div class="ag-sm-card-index">
+                                    <div class="ag-sm-live-eq"><span></span><span></span><span></span><span></span></div>
+                                    <div class="ag-sm-card-hover-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></div>
+                                </div>
                                 <div class="ag-sm-card-thumb">
                                     <img src="${STUDIO_ASSETS.hero_art}" alt="Art">
                                 </div>
@@ -2399,10 +2703,14 @@ CINEMA_JS = r"""
                                 </div>
                                 <div class="ag-sm-card-meta">
                                     <span class="ag-sm-card-dur">2:49</span>
-                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Download</span></button>
+                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>MP3</span></button>
                                 </div>
                             </div>
                             <div class="ag-sm-card" data-title="Recollect - Konomi Suzuki">
+                                <div class="ag-sm-card-index">
+                                    <span class="ag-sm-card-num">02</span>
+                                    <div class="ag-sm-card-hover-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></div>
+                                </div>
                                 <div class="ag-sm-card-thumb">
                                     <img src="${STUDIO_ASSETS.hero_art}" alt="Art">
                                 </div>
@@ -2412,10 +2720,14 @@ CINEMA_JS = r"""
                                 </div>
                                 <div class="ag-sm-card-meta">
                                     <span class="ag-sm-card-dur">3:18</span>
-                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Download</span></button>
+                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>MP3</span></button>
                                 </div>
                             </div>
                             <div class="ag-sm-card" data-title="FLASH BACK - natori">
+                                <div class="ag-sm-card-index">
+                                    <span class="ag-sm-card-num">03</span>
+                                    <div class="ag-sm-card-hover-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></div>
+                                </div>
                                 <div class="ag-sm-card-thumb">
                                     <img src="${STUDIO_ASSETS.hero_art}" alt="Art">
                                 </div>
@@ -2425,10 +2737,14 @@ CINEMA_JS = r"""
                                 </div>
                                 <div class="ag-sm-card-meta">
                                     <span class="ag-sm-card-dur">3:05</span>
-                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Download</span></button>
+                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>MP3</span></button>
                                 </div>
                             </div>
                             <div class="ag-sm-card" data-title="Deep down - Aimer">
+                                <div class="ag-sm-card-index">
+                                    <span class="ag-sm-card-num">04</span>
+                                    <div class="ag-sm-card-hover-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></div>
+                                </div>
                                 <div class="ag-sm-card-thumb">
                                     <img src="${STUDIO_ASSETS.hero_art}" alt="Art">
                                 </div>
@@ -2438,7 +2754,7 @@ CINEMA_JS = r"""
                                 </div>
                                 <div class="ag-sm-card-meta">
                                     <span class="ag-sm-card-dur">3:47</span>
-                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Download</span></button>
+                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>MP3</span></button>
                                 </div>
                             </div>
                         </div>
@@ -3060,6 +3376,10 @@ CINEMA_JS = r"""
 
                         cardsHtml += `
                             <div class="ag-sm-card${activeClass}" data-id="${t.id}" data-url="${t.url}" data-title="${cleanT.replace(/"/g, '&quot;')}">
+                                <div class="ag-sm-card-index">
+                                    ${idxDisplay}
+                                    <div class="ag-sm-card-hover-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></div>
+                                </div>
                                 <div class="ag-sm-card-thumb">
                                     <img src="${t.thumb}" alt="Art" loading="lazy">
                                 </div>
@@ -3069,7 +3389,7 @@ CINEMA_JS = r"""
                                 </div>
                                 <div class="ag-sm-card-meta">
                                     <span class="ag-sm-card-dur">${durText}</span>
-                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Download</span></button>
+                                    <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>MP3</span></button>
                                 </div>
                             </div>
                         `;
@@ -3098,7 +3418,7 @@ CINEMA_JS = r"""
                                                 setSafeHTML(btn, `${okSvg}<span>Done</span>`);
                                                 btn.style.opacity = '1';
                                                 setTimeout(() => {
-                                                    setSafeHTML(btn, `${dlSvg}<span>Download</span>`);
+                                                    setSafeHTML(btn, `${dlSvg}<span>MP3</span>`);
                                                     btn.style.pointerEvents = '';
                                                 }, 2500);
                                             })
