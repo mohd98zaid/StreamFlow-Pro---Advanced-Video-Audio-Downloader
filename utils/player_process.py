@@ -1638,124 +1638,8 @@ STUDIO_MUSIC_CSS = """/* =======================================================
 CINEMA_JS = r"""
 (function() {
     try {
-        // =========================================================================
-        // BRAVE-STYLE JSON-PRUNING & PLAYER RESPONSE INTERCEPTION
-        // Intercepts and prunes adPlacements / playerAds before the player loads ads
-        // =========================================================================
-        function cleanPlayerResponse(obj) {
-            if (!obj || typeof obj !== 'object') return;
-            
-            // Delete root ad properties
-            const adKeys = [
-                'adPlacements', 
-                'playerAds', 
-                'adSlots', 
-                'adBreakHeartbeatParams', 
-                'auxiliaryUi', 
-                'adSignalsInfo',
-                'legacyImportant'
-            ];
-            for (let i = 0; i < adKeys.length; i++) {
-                if (adKeys[i] in obj) delete obj[adKeys[i]];
-            }
-            
-            // Delete nested playerResponse ads
-            if (obj.playerResponse && typeof obj.playerResponse === 'object') {
-                for (let i = 0; i < adKeys.length; i++) {
-                    if (adKeys[i] in obj.playerResponse) delete obj.playerResponse[adKeys[i]];
-                }
-            }
-        }
-
-        // 1. Intercept and prune window.ytInitialPlayerResponse
-        try {
-            if (window.ytInitialPlayerResponse) {
-                cleanPlayerResponse(window.ytInitialPlayerResponse);
-            }
-            let _initialResponse = window.ytInitialPlayerResponse;
-            Object.defineProperty(window, 'ytInitialPlayerResponse', {
-                get() { return _initialResponse; },
-                set(val) {
-                    if (val && typeof val === 'object') {
-                        cleanPlayerResponse(val);
-                    }
-                    _initialResponse = val;
-                },
-                configurable: true
-            });
-        } catch(e) {}
-
-        // 2. Intercept window.fetch for /youtubei/v1/player (SPA video navigations)
-        try {
-            if (!window._fetchPatched) {
-                window._fetchPatched = true;
-                const originalFetch = window.fetch;
-                window.fetch = async function(...args) {
-                    const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
-                    if (typeof url === 'string' && (
-                        url.includes('/api/stats/ads') || 
-                        url.includes('/pagead/') || 
-                        url.includes('doubleclick.net')
-                    )) {
-                        return new Response('', { status: 204, statusText: 'No Content' });
-                    }
-                    const response = await originalFetch.apply(this, args);
-                    if (url && url.includes('/youtubei/v1/player')) {
-                        try {
-                            const clone = response.clone();
-                            const json = await clone.json();
-                            if (json && typeof json === 'object') {
-                                cleanPlayerResponse(json);
-                                return new Response(JSON.stringify(json), {
-                                    status: response.status,
-                                    statusText: response.statusText,
-                                    headers: response.headers
-                                });
-                            }
-                        } catch(err) {}
-                    }
-                    return response;
-                };
-            }
-        } catch(e) {}
-
-        // 3. Intercept XMLHttpRequest for /youtubei/v1/player
-        try {
-            if (!window._xhrPatched) {
-                window._xhrPatched = true;
-                const originalXHROpen = XMLHttpRequest.prototype.open;
-                const originalXHRSend = XMLHttpRequest.prototype.send;
-                
-                XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-                    this._url = url;
-                    return originalXHROpen.apply(this, [method, url, ...rest]);
-                };
-                
-                XMLHttpRequest.prototype.send = function(...args) {
-                    if (this._url && this._url.includes('/youtubei/v1/player')) {
-                        this.addEventListener('readystatechange', function() {
-                            if (this.readyState === 4 && this.status === 200) {
-                                try {
-                                    const parsed = JSON.parse(this.responseText);
-                                    cleanPlayerResponse(parsed);
-                                    Object.defineProperty(this, 'responseText', {
-                                        value: JSON.stringify(parsed),
-                                        writable: false,
-                                        configurable: true
-                                    });
-                                    Object.defineProperty(this, 'response', {
-                                        value: JSON.stringify(parsed),
-                                        writable: false,
-                                        configurable: true
-                                    });
-                                } catch(err) {}
-                            }
-                        });
-                    }
-                    return originalXHRSend.apply(this, args);
-                };
-            }
-        } catch(e) {}
+        // Untouched native network layer: preserving authentic YouTube SABR streaming and InnerTube attestation
+        // to prevent player errors, playback freezes, and automatic song skipping.
 
         function safeGetStorage(key) {
             try {
@@ -3724,33 +3608,13 @@ CINEMA_JS = r"""
                 const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
                 const video = document.querySelector('video');
 
-                // 1. Unconditionally click any skip button across the entire page
-                const skipSelectors = [
-                    '.ytp-ad-skip-button',
-                    '.ytp-ad-skip-button-modern',
-                    '.ytp-skip-ad-button',
-                    '.ytp-ad-skip-button-slot button',
-                    '.ytp-ad-skip-button-container button',
-                    'button[class*="ytp-ad-skip"]',
-                    '.ytp-ad-overlay-close-button',
-                    'button.ytp-ad-survey-answer'
-                ];
-                for (let i = 0; i < skipSelectors.length; i++) {
-                    const btns = document.querySelectorAll(skipSelectors[i]);
-                    for (let j = 0; j < btns.length; j++) {
-                        if (btns[j] && typeof btns[j].click === 'function') {
-                            try { btns[j].click(); } catch(e) {}
-                        }
-                    }
-                }
-
-                // 2. Multi-signal in-stream ad detection
-                const hasAdClass = !!(player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')));
-                const hasAdOverlay = !!document.querySelector(
-                    '.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-module:not([style*="display: none"]), .ytp-ad-text, .ytp-ad-preview-container'
+                // 1. Strict, high-precision in-stream ad detection (ONLY when ad is actually playing)
+                const hasAdClass = !!(
+                    (player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))) ||
+                    document.querySelector('.ad-showing, .ad-interrupting, ytd-player.ad-showing, ytmusic-player-bar[is-ad_]')
                 );
                 const isAdState = !!(player && typeof player.getAdState === 'function' && player.getAdState() > 0);
-                const isAdShowing = hasAdClass || hasAdOverlay || isAdState;
+                const isAdShowing = hasAdClass || isAdState;
 
                 if (isAdShowing && video) {
                     if (!isAdActive) {
@@ -3761,18 +3625,33 @@ CINEMA_JS = r"""
                         originalMuted = video.muted;
                     }
 
-                    // A. Instant mute & zero volume (no audio leak during ad)
+                    // A. Instant mute (silences ad audio immediately)
                     video.muted = true;
-                    video.volume = 0;
 
                     // B. Accelerate ad to 16x speed (silently finishes unskippable ads in a fraction of a second)
                     if (video.playbackRate !== 16.0) {
                         video.playbackRate = 16.0;
                     }
 
-                    // C. Player API skip
-                    if (player && typeof player.skipAd === 'function') {
-                        try { player.skipAd(); } catch(e) {}
+                    // C. Click native skip button if present
+                    const skipSelectors = [
+                        '.ytp-ad-skip-button',
+                        '.ytp-ad-skip-button-modern',
+                        '.ytp-skip-ad-button',
+                        '.ytp-ad-skip-button-slot button',
+                        '.ytp-ad-skip-button-container button',
+                        '.ytmusic-skip-ad-button',
+                        'button[class*="skip-ad"]',
+                        'button[class*="ytp-ad-skip"]'
+                    ];
+                    for (let i = 0; i < skipSelectors.length; i++) {
+                        const btns = document.querySelectorAll(skipSelectors[i]);
+                        for (let j = 0; j < btns.length; j++) {
+                            const btn = btns[j];
+                            if (btn && typeof btn.click === 'function') {
+                                try { btn.click(); } catch(e) {}
+                            }
+                        }
                     }
 
                     // D. Remove visual ad overlays
@@ -3783,20 +3662,19 @@ CINEMA_JS = r"""
                         try { ov.remove(); } catch(e) {}
                     });
                 } else {
-                    // Normal video playing - cleanly restore genuine playback rate and volume
+                    // Normal video / song playing - cleanly restore genuine playback rate and volume
                     if (isAdActive) {
                         isAdActive = false;
                         if (video) {
                             video.playbackRate = originalPlaybackRate || 1.0;
                             video.muted = originalMuted;
-                            if (video.volume === 0 && !originalMuted) {
-                                video.volume = 1;
-                            }
                         }
+                    } else if (video && video.playbackRate === 16.0) {
+                        video.playbackRate = 1.0;
                     }
                 }
 
-                // 3. Auto-dismiss & remove YouTube Anti-Adblock Warning Modals
+                // 2. Auto-dismiss & remove YouTube Anti-Adblock Warning Modals
                 const enforcement = document.querySelector('ytd-enforcement-message-view-model, yt-upsell-dialog-renderer');
                 if (enforcement) {
                     const modal = enforcement.closest('tp-yt-paper-dialog') || enforcement;
@@ -3826,7 +3704,7 @@ CINEMA_JS = r"""
                     }
                 }
 
-                // 4. Remove non-video promotional overlays
+                // 3. Remove non-video promotional overlays
                 const promo = document.querySelector('.ytp-ad-overlay-container, ytd-banner-promo-renderer');
                 if (promo) promo.remove();
 
