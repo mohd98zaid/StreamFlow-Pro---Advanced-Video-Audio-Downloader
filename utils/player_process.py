@@ -620,10 +620,91 @@ body.ag-cinema-active #antigravity-top-controls.hidden {
 #antigravity-top-controls:hover .ag-dock-actions,
 #antigravity-top-controls.ag-dock-hovered .ag-dock-actions,
 #antigravity-top-controls.ag-dock-expanded .ag-dock-actions {
-    max-width: 900px;
+    max-width: 1000px;
     opacity: 1;
     pointer-events: auto;
     transform: scale(1);
+}
+
+/* Persistent Top-Left Page Navigation Back Button for YouTube */
+#antigravity-page-back-btn {
+    position: fixed !important;
+    top: 9px !important;
+    left: 14px !important;
+    z-index: 2147483646 !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    background: rgba(15, 23, 42, 0.88) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                background 0.2s ease,
+                border-color 0.2s ease,
+                box-shadow 0.2s ease !important;
+    user-select: none !important;
+    pointer-events: auto !important;
+}
+
+#antigravity-page-back-btn:hover {
+    background: #2563EB !important;
+    border-color: #60A5FA !important;
+    transform: scale(1.08) !important;
+    box-shadow: 0 6px 22px rgba(37, 99, 235, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+}
+
+#antigravity-page-back-btn:active {
+    transform: scale(0.94) !important;
+}
+
+#antigravity-page-back-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+    stroke: #FFFFFF !important;
+    transition: transform 0.2s ease !important;
+}
+
+#antigravity-page-back-btn:hover svg {
+    transform: translateX(-2px) !important;
+}
+
+#antigravity-page-back-btn.hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateX(-12px) !important;
+}
+
+/* In regular YouTube, shift masthead start by 48px so back button sits cleanly */
+ytd-masthead #start,
+#masthead #start {
+    margin-left: 48px !important;
+}
+
+/* In Cinema Mode, adjust position and handle inactivity fade */
+body.ag-cinema-active #antigravity-page-back-btn {
+    top: 14px !important;
+    left: 18px !important;
+    background: rgba(15, 23, 42, 0.85) !important;
+}
+
+.ag-back-btn {
+    background: rgba(30, 41, 59, 0.92) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    color: #F8FAFC !important;
+}
+
+.ag-back-btn:hover {
+    background: #2563EB !important;
+    border-color: #60A5FA !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4) !important;
 }
 
 /* Sleek StreamFlow Brand Trigger Pill */
@@ -1962,6 +2043,98 @@ CINEMA_JS = r"""
             (document.head || document.documentElement).appendChild(studioStyle);
         }
 
+        // Navigation History & Smart Back Navigation Engine
+        function trackBrowseUrl() {
+            try {
+                const href = window.location.href;
+                const path = window.location.pathname;
+                // If on search results, browse feed, or home page (not playing a specific video)
+                if (!window.location.search.includes('v=') && !path.includes('/watch')) {
+                    safeSetStorage('ag_last_browse_url', href);
+                }
+            } catch(e) {}
+        }
+        trackBrowseUrl();
+
+        function handleNavigationBack() {
+            // 1. If currently in Music Studio, exit cleanly to normal YouTube or Video view
+            if (typeof isStudioActive !== 'undefined' && isStudioActive) {
+                if (typeof window.setStudioMode === 'function') {
+                    window.setStudioMode(false);
+                    return;
+                }
+            }
+            // 2. If in Cinema Mode, disable cinema mode so normal YouTube page is shown
+            if (document.body && document.body.classList.contains('ag-cinema-active')) {
+                document.body.classList.remove('ag-cinema-active');
+                if (typeof isCinema !== 'undefined') isCinema = false;
+            }
+
+            const initialHref = window.location.href;
+            try {
+                window.history.back();
+            } catch(e) {}
+
+            // Robust safety fallback: if URL has not changed after 350ms (history depleted or opened directly)
+            setTimeout(() => {
+                if (window.location.href === initialHref) {
+                    const fallbackUrl = safeGetStorage('ag_last_browse_url') || 'https://www.youtube.com';
+                    window.location.href = fallbackUrl;
+                }
+            }, 350);
+        }
+
+        // Top-Left Circular Back Button pinned beside YouTube Masthead / Player
+        function injectPageBackButton() {
+            let backBtn = document.getElementById('antigravity-page-back-btn');
+            if (!backBtn) {
+                backBtn = document.createElement('button');
+                backBtn.id = 'antigravity-page-back-btn';
+                backBtn.title = 'Back to search / previous page (Alt + Left)';
+                backBtn.setAttribute('aria-label', 'Go back');
+
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('stroke-width', '2.5');
+                svg.setAttribute('stroke-linecap', 'round');
+                svg.setAttribute('stroke-linejoin', 'round');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', 'M19 12H5M12 19l-7-7 7-7');
+                svg.appendChild(path);
+                backBtn.appendChild(svg);
+
+                const triggerBack = (e) => {
+                    if (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                    }
+                    handleNavigationBack();
+                };
+                backBtn.onclick = triggerBack;
+                backBtn.addEventListener('click', triggerBack, true);
+                backBtn.addEventListener('pointerdown', (e) => { if (e) e.stopPropagation(); }, true);
+
+                const root = document.body || document.documentElement;
+                if (root) root.appendChild(backBtn);
+            }
+            updatePageBackButtonVisibility();
+            return backBtn;
+        }
+
+        function updatePageBackButtonVisibility() {
+            const btn = document.getElementById('antigravity-page-back-btn');
+            if (!btn) return;
+            const isStudio = typeof isStudioActive !== 'undefined' && isStudioActive;
+            if (isStudio) {
+                btn.style.display = 'none';
+                return;
+            }
+            btn.style.display = 'inline-flex';
+        }
+
         // 5. Inject Top Controls Container
         function injectTopControls() {
             let controls = document.getElementById('antigravity-top-controls');
@@ -1982,6 +2155,20 @@ CINEMA_JS = r"""
             controls = document.createElement('div');
             controls.id = 'antigravity-top-controls';
             
+            // 0. Back Navigation Button
+            const backBtn = document.createElement('button');
+            backBtn.className = 'ag-control-btn ag-back-btn';
+            backBtn.id = 'agBackBtn';
+            backBtn.textContent = '⬅ Back';
+            backBtn.title = 'Go back to previous page or search results (Alt + Left)';
+            backBtn.onclick = (e) => {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                handleNavigationBack();
+            };
+
             // A. Maximize Screen Button
             const fsBtn = document.createElement('button');
             fsBtn.className = 'ag-control-btn';
@@ -2063,6 +2250,7 @@ CINEMA_JS = r"""
             actionsWrap.className = 'ag-dock-actions';
             actionsWrap.id = 'agDockActions';
 
+            actionsWrap.appendChild(backBtn);
             actionsWrap.appendChild(fsBtn);
             actionsWrap.appendChild(studioBtn);
             actionsWrap.appendChild(musicBtn);
@@ -2076,6 +2264,7 @@ CINEMA_JS = r"""
         }
 
         let controls = injectTopControls();
+        injectPageBackButton();
 
         function ensureTopControls() {
             let controls = document.getElementById('antigravity-top-controls');
@@ -2086,6 +2275,7 @@ CINEMA_JS = r"""
             } else if (document.body && controls.parentElement !== document.body) {
                 document.body.appendChild(controls);
             }
+            injectPageBackButton();
         }
 
         const isMusicSite = window.location.hostname.includes('music.youtube.com');
@@ -2134,6 +2324,8 @@ CINEMA_JS = r"""
                     }
                 }
             }
+            if (typeof trackBrowseUrl === 'function') trackBrowseUrl();
+            if (typeof updatePageBackButtonVisibility === 'function') updatePageBackButtonVisibility();
         }
         updatePageMode();
 
@@ -2408,12 +2600,18 @@ CINEMA_JS = r"""
 
         function resetTimer() {
             const ctrl = document.getElementById('antigravity-top-controls');
+            const pageBack = document.getElementById('antigravity-page-back-btn');
             if (ctrl) ctrl.classList.remove('hidden');
+            if (pageBack && document.body && document.body.classList.contains('ag-cinema-active')) {
+                pageBack.classList.remove('hidden');
+            }
             clearTimeout(hideTimer);
             if (!isHovered && document.body && document.body.classList.contains('ag-cinema-active')) {
                 hideTimer = setTimeout(() => {
                     const c = document.getElementById('antigravity-top-controls');
                     if (c) c.classList.add('hidden');
+                    const pb = document.getElementById('antigravity-page-back-btn');
+                    if (pb) pb.classList.add('hidden');
                 }, 3500);
             }
         }
@@ -2517,6 +2715,9 @@ CINEMA_JS = r"""
                 <!-- TOP HEADER -->
                 <header class="ag-sm-header">
                     <div class="ag-sm-header-left">
+                        <button class="ag-sm-hdr-icon-btn ag-sm-back-arrow" id="agSmBackArrow" title="Back to previous page or YouTube view (Alt + Left)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                        </button>
                         <div class="ag-sm-brand" id="agSmBrandLogo">
                             <div class="ag-sm-brand-icon">
                                 <span></span><span></span><span></span><span></span><span></span>
@@ -2860,6 +3061,7 @@ CINEMA_JS = r"""
                     studioUI.style.opacity = '1';
                 }
                 if (topControls) topControls.style.display = 'none';
+                if (typeof updatePageBackButtonVisibility === 'function') updatePageBackButtonVisibility();
                 try { syncStudioPlayer(); } catch(err) {}
                 try { fetchContextualRecommendations(); } catch(err) {}
                 try { startVisualizer(); } catch(err) {}
@@ -2869,6 +3071,7 @@ CINEMA_JS = r"""
                     studioUI.style.display = 'none';
                 }
                 if (topControls) topControls.style.display = '';
+                if (typeof updatePageBackButtonVisibility === 'function') updatePageBackButtonVisibility();
             }
         };
         const setStudioMode = window.setStudioMode;
@@ -2890,7 +3093,10 @@ CINEMA_JS = r"""
                 e.stopPropagation();
                 setStudioMode(false);
             } else if (target.id === 'agSmBackArrow' || target.closest('#agSmBackArrow')) {
-                window.history.back();
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                handleNavigationBack();
             } else if (target.id === 'agSmFwdArrow' || target.closest('#agSmFwdArrow')) {
                 window.history.forward();
             } else if (target.id === 'agSmHdrFsBtn' || target.closest('#agSmHdrFsBtn')) {
@@ -4067,21 +4273,52 @@ CINEMA_JS = r"""
         // Keep active across Single Page Application (SPA) YouTube video navigations
         window.addEventListener('yt-navigate-finish', () => {
             isAdActive = false;
+            if (typeof trackBrowseUrl === 'function') trackBrowseUrl();
+            if (typeof updatePageBackButtonVisibility === 'function') updatePageBackButtonVisibility();
             if (typeof updatePageMode === 'function') updatePageMode();
             processAdBlocker();
         });
         window.addEventListener('popstate', () => {
+            if (typeof trackBrowseUrl === 'function') trackBrowseUrl();
+            if (typeof updatePageBackButtonVisibility === 'function') updatePageBackButtonVisibility();
             if (typeof updatePageMode === 'function') updatePageMode();
+        });
+
+        // Global Keyboard & Mouse Navigation Shortcuts
+        window.addEventListener('keydown', (e) => {
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+            const isEditing = tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable);
+            if (isEditing) return;
+
+            // Alt + LeftArrow -> Back
+            if (e.altKey && (e.key === 'ArrowLeft' || e.keyCode === 37)) {
+                e.preventDefault();
+                handleNavigationBack();
+            } else if (e.key === 'Backspace' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                // Backspace as back navigation when not editing text
+                e.preventDefault();
+                handleNavigationBack();
+            }
+        });
+
+        // Mouse Button 3 (Back)
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 3) {
+                e.preventDefault();
+                handleNavigationBack();
+            }
         });
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 ensureTopControls();
+                injectPageBackButton();
                 updatePageMode();
                 processAdBlocker();
             });
             window.addEventListener('load', () => {
                 ensureTopControls();
+                injectPageBackButton();
                 updatePageMode();
                 processAdBlocker();
             });
