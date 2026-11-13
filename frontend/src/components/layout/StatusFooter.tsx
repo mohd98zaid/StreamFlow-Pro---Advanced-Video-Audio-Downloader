@@ -1,5 +1,5 @@
 import React from "react";
-import { Activity, HardDrive, CheckCircle2 } from "lucide-react";
+import { Activity, HardDrive } from "lucide-react";
 import { useQueueStore } from "../../stores/useQueueStore";
 import { useSettingsStore } from "../../stores/useSettingsStore";
 

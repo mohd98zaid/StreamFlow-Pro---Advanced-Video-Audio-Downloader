@@ -56,7 +56,14 @@ def main():
     dist_index = ROOT_DIR / "frontend" / "dist" / "index.html"
     if not dist_index.exists():
         print("[!] Frontend production bundle not found. Building now...")
-        subprocess.run(["npm.cmd", "run", "build"], cwd=str(ROOT_DIR / "frontend"), shell=True)
+        build_result = subprocess.run(
+            ["npm.cmd", "run", "build"],
+            cwd=str(ROOT_DIR / "frontend"),
+            check=False,
+        )
+        if build_result.returncode != 0 or not dist_index.exists():
+            print("[!] Frontend build failed. Run `npm install` and `npm run build` in frontend/.")
+            return 1
 
     # 2. Start FastAPI backend in background daemon thread
     print("\n[1/2] Starting local Python download engine & WebSocket bridge...")
@@ -94,4 +101,4 @@ def main():
             print("\nShutting down StreamFlow Pro...")
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main() or 0)

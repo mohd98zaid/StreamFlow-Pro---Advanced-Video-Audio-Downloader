@@ -1,5 +1,5 @@
 import React from "react";
-import { DownloadCloud, Sparkles } from "lucide-react";
+import { DownloadCloud } from "lucide-react";
 import { QueueSummary } from "../components/queue/QueueSummary";
 import { QueueItemRow } from "../components/queue/QueueItemRow";
 import { useQueueStore } from "../stores/useQueueStore";

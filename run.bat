@@ -13,13 +13,9 @@ if exist "venv\Scripts\activate.bat" (
 
 :: Detect Python executable (python or py)
 where python >nul 2>nul
-if %ERRORLEVEL% EQU 0 (
-    set "PYTHON_CMD=python"
-) else (
+if errorlevel 1 (
     where py >nul 2>nul
-    if %ERRORLEVEL% EQU 0 (
-        set "PYTHON_CMD=py"
-    ) else (
+    if errorlevel 1 (
         echo.
         echo ========================================================
         echo  [!] ERROR: Python is not detected in your system PATH.
@@ -29,7 +25,11 @@ if %ERRORLEVEL% EQU 0 (
         echo.
         pause
         exit /b 1
+    ) else (
+        set "PYTHON_CMD=py"
     )
+) else (
+    set "PYTHON_CMD=python"
 )
 
 :: Check direct command line arguments

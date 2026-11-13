@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Download, CheckCircle2, Sparkles, ArrowRight, AlertCircle } from "lucide-react";
+import { Download, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react";
 import { UrlHeroInput } from "../components/downloads/UrlHeroInput";
 import { MetadataCard } from "../components/downloads/MetadataCard";
 import { FormatOptions } from "../components/downloads/FormatOptions";
@@ -74,8 +74,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onGoToQueue }) => {
     }
   };
 
-  const isIdle = !isSubmitting && !isExtracting && downloadState === "idle";
-
   return (
     <div className="w-full h-full overflow-y-auto p-6 space-y-6 max-w-4xl mx-auto animate-fade-in select-none">
       {/* Hero Header */}
@@ -120,7 +118,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onGoToQueue }) => {
           ) : downloadState === "success" ? (
             <>
               <CheckCircle2 className="w-4 h-4 text-white" />
-              <span>Added to Queue!</span>
+              <span>Added to Queue</span>
+              <ArrowRight className="w-4 h-4 ml-1" />
             </>
           ) : downloadState === "error" ? (
             <>
@@ -138,6 +137,15 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onGoToQueue }) => {
             </>
           )}
         </button>
+        {downloadState === "success" && (
+          <button
+            type="button"
+            onClick={onGoToQueue}
+            className="mt-2 w-full h-9 rounded-xl border border-border-glass bg-surface-elevated/45 text-xs font-semibold text-foreground-muted hover:text-foreground hover:bg-surface-elevated transition-colors"
+          >
+            View download queue
+          </button>
+        )}
       </div>
     </div>
   );

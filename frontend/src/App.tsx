@@ -24,17 +24,17 @@ export function App() {
     wsClient.connect();
 
     // 2. Load configurations and initial state
-    loadConfig();
-    loadPresets();
-    fetchQueue();
+    void loadConfig();
+    void loadPresets();
+    void fetchQueue();
 
     return () => {
       wsClient.disconnect();
     };
-  }, []);
+  }, [fetchQueue, loadConfig, loadPresets]);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none relative">
+    <div className="flex min-h-dvh h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none relative app-canvas">
       {/* 1. In-App Floating Toast System */}
       <ToastContainer />
 
@@ -45,7 +45,7 @@ export function App() {
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <main className="flex-1 overflow-hidden relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-surface-elevated/20 via-background to-background">
+        <main id="main-content" className="flex-1 min-w-0 overflow-hidden relative bg-transparent">
           {/* Ambient Studio Lighting Orbs */}
           <div className="ambient-glow-top" />
           <div className="ambient-glow-bottom" />

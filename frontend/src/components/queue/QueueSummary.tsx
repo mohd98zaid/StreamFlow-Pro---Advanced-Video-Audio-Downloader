@@ -1,5 +1,5 @@
 import React from "react";
-import { Play, Pause, Trash2, CheckCircle2, Clock, Radio, AlertCircle } from "lucide-react";
+import { Play, Pause, Trash2, CheckCircle2, Clock, Radio, AlertCircle, X } from "lucide-react";
 import { useQueueStore } from "../../stores/useQueueStore";
 import { GlassSurface } from "../ui/GlassSurface";
 
@@ -43,6 +43,13 @@ export const QueueSummary: React.FC = () => {
           </span>
         )}
 
+        {summary.cancelled > 0 && (
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-surface-elevated text-foreground-subtle font-semibold border border-border-hairline">
+            <X className="w-3 h-3" />
+            <span>{summary.cancelled} Cancelled</span>
+          </span>
+        )}
+
         {summary.total === 0 && (
           <span className="text-foreground-subtle text-xs">No active items</span>
         )}
@@ -70,13 +77,13 @@ export const QueueSummary: React.FC = () => {
           </button>
         )}
 
-        {summary.completed > 0 && (
+        {(summary.completed > 0 || summary.failed > 0 || summary.cancelled > 0) && (
           <button
             onClick={clearCompleted}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-surface-elevated text-xs font-semibold text-foreground-subtle hover:text-foreground transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear Completed</span>
+            <span>Clear Finished</span>
           </button>
         )}
       </div>

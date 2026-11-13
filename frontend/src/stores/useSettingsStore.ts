@@ -47,6 +47,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       }
     } catch (err) {
       console.error("Failed to update settings:", err);
+      throw err;
     }
   },
 

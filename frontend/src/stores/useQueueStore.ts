@@ -3,6 +3,7 @@ import { DownloadItem, QueueSummary } from "../types/download";
 import { api } from "../services/api";
 import { wsClient } from "../services/websocket";
 import { WebSocketEnvelope } from "../types/events";
+import { useToastStore } from "./useToastStore";
 
 interface QueueStore {
   items: DownloadItem[];
@@ -31,6 +32,7 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     paused: 0,
     completed: 0,
     failed: 0,
+    cancelled: 0,
   },
   isLoading: false,
   statusMessage: "Engine Ready",
@@ -49,48 +51,93 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     set((state) => ({
       items: state.items.map((i) => (i.id === id ? { ...i, status: "Paused", speed: "Paused" } : i)),
     }));
-    await api.pauseItem(id);
+    try {
+      const result = await api.pauseItem(id);
+      if (!result.success) throw new Error("The download could not be paused");
+      await get().fetchQueue();
+    } catch (err: any) {
+      await get().fetchQueue();
+      useToastStore.getState().error(err?.message || "The download could not be paused", "Queue Error");
+    }
   },
 
   resumeItem: async (id: string) => {
     set((state) => ({
       items: state.items.map((i) => (i.id === id ? { ...i, status: "Queued", speed: "Waiting" } : i)),
     }));
-    await api.resumeItem(id);
+    try {
+      const result = await api.resumeItem(id);
+      if (!result.success) throw new Error("The download could not be resumed");
+      await get().fetchQueue();
+    } catch (err: any) {
+      await get().fetchQueue();
+      useToastStore.getState().error(err?.message || "The download could not be resumed", "Queue Error");
+    }
   },
 
   cancelItem: async (id: string) => {
     set((state) => ({
       items: state.items.map((i) => (i.id === id ? { ...i, status: "Cancelled", speed: "Cancelled" } : i)),
     }));
-    await api.cancelItem(id);
+    try {
+      const result = await api.cancelItem(id);
+      if (!result.success) throw new Error("The download could not be cancelled");
+      await get().fetchQueue();
+    } catch (err: any) {
+      await get().fetchQueue();
+      useToastStore.getState().error(err?.message || "The download could not be cancelled", "Queue Error");
+    }
   },
 
   retryItem: async (id: string) => {
-    await api.retryItem(id);
-    get().fetchQueue();
+    try {
+      const result = await api.retryItem(id);
+      if (!result.success) throw new Error("The download could not be retried");
+      await get().fetchQueue();
+    } catch (err: any) {
+      useToastStore.getState().error(err?.message || "The download could not be retried", "Queue Error");
+    }
   },
 
   removeItem: async (id: string) => {
     set((state) => ({
       items: state.items.filter((i) => i.id !== id),
     }));
-    await api.removeItem(id);
+    try {
+      const result = await api.removeItem(id);
+      if (!result.success) throw new Error("The queue item could not be removed");
+      await get().fetchQueue();
+    } catch (err: any) {
+      await get().fetchQueue();
+      useToastStore.getState().error(err?.message || "The queue item could not be removed", "Queue Error");
+    }
   },
 
   pauseAll: async () => {
-    await api.pauseAll();
-    get().fetchQueue();
+    try {
+      await api.pauseAll();
+      await get().fetchQueue();
+    } catch (err: any) {
+      useToastStore.getState().error(err?.message || "The queue could not be paused", "Queue Error");
+    }
   },
 
   resumeAll: async () => {
-    await api.resumeAll();
-    get().fetchQueue();
+    try {
+      await api.resumeAll();
+      await get().fetchQueue();
+    } catch (err: any) {
+      useToastStore.getState().error(err?.message || "The queue could not be resumed", "Queue Error");
+    }
   },
 
   clearCompleted: async () => {
-    await api.clearCompleted();
-    get().fetchQueue();
+    try {
+      await api.clearCompleted();
+      await get().fetchQueue();
+    } catch (err: any) {
+      useToastStore.getState().error(err?.message || "Finished queue items could not be cleared", "Queue Error");
+    }
   },
 
   handleWebSocketEvent: (envelope: WebSocketEnvelope) => {

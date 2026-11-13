@@ -122,7 +122,7 @@ export const UrlHeroInput: React.FC = () => {
             <Badge variant="cyan" className="gap-1.5 px-3 py-0.5 rounded-full shadow-sm">
               <CheckCircle2 className="w-3 h-3 text-accent-cyan" />
               <span>
-                {detectedUrls.length} {detectedUrls.length === 1 ? "Link verified" : "Links ready for batch queue"}
+                {detectedUrls.length} {detectedUrls.length === 1 ? "Link detected" : "Links ready for batch queue"}
               </span>
             </Badge>
           ) : (

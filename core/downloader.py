@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict, Any, List
 import yt_dlp
 
 try:
@@ -35,9 +35,15 @@ class Downloader:
         self.download_queue = DownloadQueue()
         
         # Concurrent download settings
-        self.max_concurrent = config_manager.get("concurrent_downloads", 3)
+        try:
+            configured_concurrency = int(config_manager.get("concurrent_downloads", 3))
+        except (TypeError, ValueError):
+            configured_concurrency = 3
+        self.max_concurrent = max(1, min(32, configured_concurrency))
+        self.executor_lock = threading.Lock()
         self.executor = ThreadPoolExecutor(max_workers=self.max_concurrent, 
-                                          thread_name_prefix="Downloader")
+                                           thread_name_prefix="Downloader")
+        self.retired_executors: List[ThreadPoolExecutor] = []
         self.active_downloads: Dict[str, DownloadItem] = {}
         self.active_downloads_lock = threading.Lock()
         
@@ -510,8 +516,11 @@ class Downloader:
                         if item:
                             with self.active_downloads_lock:
                                 self.active_downloads[item.id] = item
-                            # Submit to thread pool
-                            self.executor.submit(self.download_item, item)
+                            # Submit while holding the executor lock so a live
+                            # worker-count change cannot swap the pool between
+                            # selecting the executor and submitting the task.
+                            with self.executor_lock:
+                                self.executor.submit(self.download_item, item)
                             active_count += 1
                         else:
                             break
@@ -535,6 +544,22 @@ class Downloader:
             )
             self.queue_processor_thread.start()
             self.log("Queue processor started")
+
+    def set_max_concurrent(self, value: int) -> None:
+        """Apply a worker-count change to scheduling and the thread pool."""
+        value = max(1, min(32, int(value)))
+        with self.executor_lock:
+            if value == self.max_concurrent:
+                return
+            old_executor = self.executor
+            self.max_concurrent = value
+            self.executor = ThreadPoolExecutor(
+                max_workers=value,
+                thread_name_prefix="Downloader",
+            )
+            self.retired_executors.append(old_executor)
+        # Existing downloads finish on the old pool; new work uses the new pool.
+        old_executor.shutdown(wait=False)
     
     def load_history(self) -> None:
         """Load history from database"""
@@ -550,6 +575,12 @@ class Downloader:
         """Shutdown downloader gracefully"""
         self.running = False
         self.stop_download = True
-        self.executor.shutdown(wait=True)
+        with self.executor_lock:
+            executor = self.executor
+            retired_executors = list(self.retired_executors)
+            self.retired_executors.clear()
+        executor.shutdown(wait=True)
+        for retired_executor in retired_executors:
+            retired_executor.shutdown(wait=True)
         self.database.close()
         self.log("Downloader shutdown complete")

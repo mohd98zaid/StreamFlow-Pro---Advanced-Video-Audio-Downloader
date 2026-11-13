@@ -28,12 +28,15 @@ interface DownloadStore {
   setEmbedSubtitles: (val: boolean) => void;
   applyPreset: (presetName: string) => void;
 
-  extractMetadata: (url: string) => Promise<void>;
+  extractMetadata: (url: string, requestId?: number) => Promise<void>;
   loadPresets: () => Promise<void>;
   resetInput: () => void;
 }
 
-export const useDownloadStore = create<DownloadStore>((set, get) => ({
+export const useDownloadStore = create<DownloadStore>((set, get) => {
+  let extractionSequence = 0;
+
+  return {
   urlInput: "",
   detectedUrls: [],
   isExtracting: false,
@@ -51,6 +54,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   activePreset: "Default",
 
   setUrlInput: (text: string) => {
+    const requestId = ++extractionSequence;
     set({ urlInput: text });
     const lines = text
       .split("\n")
@@ -58,19 +62,24 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
       .filter((l) => l.startsWith("http://") || l.startsWith("https://"));
     set({ detectedUrls: lines });
 
-    // Auto-extract metadata for single entered URL
-    if (lines.length === 1 && lines[0] !== get().metadata?.url) {
-      get().extractMetadata(lines[0]);
-    } else if (lines.length === 0) {
-      set({ metadata: null, error: null });
+    // Auto-extract metadata for a single entered URL. Older responses are ignored.
+    if (lines.length === 1) {
+      if (lines[0] !== get().metadata?.url) {
+        set({ metadata: null, error: null });
+        void get().extractMetadata(lines[0], requestId);
+      } else {
+        set({ error: null, isExtracting: false });
+      }
+    } else {
+      set({ metadata: null, error: null, isExtracting: false });
     }
   },
 
   setDownloadType: (type: DownloadType) => {
-    set({ downloadType: type });
-    if (type === "audio") {
-      set({ formatType: "mp3" });
-    }
+    set({
+      downloadType: type,
+      formatType: type === "audio" ? "mp3" : "mp4",
+    });
   },
 
   setQuality: (quality: string) => set({ quality }),
@@ -93,13 +102,16 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     });
   },
 
-  extractMetadata: async (url: string) => {
+  extractMetadata: async (url: string, requestId?: number) => {
+    const activeRequestId = requestId ?? ++extractionSequence;
     set({ isExtracting: true, error: null });
     try {
       const data = await api.fetchMetadata(url);
+      if (activeRequestId !== extractionSequence) return;
+
       set({ metadata: data, isExtracting: false });
       if (data.is_playlist) {
-        set({ downloadType: "playlist" });
+        set({ downloadType: "playlist", formatType: "mp4" });
       }
       if (data.available_qualities && data.available_qualities.length > 0) {
         if (!data.available_qualities.includes(get().quality)) {
@@ -107,6 +119,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         }
       }
     } catch (err: any) {
+      if (activeRequestId !== extractionSequence) return;
       set({ isExtracting: false, error: err.message || "Failed to inspect media info" });
     }
   },
@@ -121,6 +134,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   },
 
   resetInput: () => {
+    extractionSequence += 1;
     set({
       urlInput: "",
       detectedUrls: [],
@@ -129,4 +143,5 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
       isExtracting: false,
     });
   },
-}));
+  };
+});

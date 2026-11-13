@@ -38,6 +38,7 @@ export interface QueueSummary {
   paused: number;
   completed: number;
   failed: number;
+  cancelled: number;
 }
 
 export interface FormatPreset {

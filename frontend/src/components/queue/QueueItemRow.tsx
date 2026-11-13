@@ -9,12 +9,10 @@ import {
   Clock,
   Sparkles,
   CheckCircle2,
-  Tv,
 } from "lucide-react";
 import { DownloadItem } from "../../types/download";
 import { useQueueStore } from "../../stores/useQueueStore";
 import { ProgressBar } from "../ui/ProgressBar";
-import { Badge } from "../ui/Badge";
 import { MediaArtwork } from "../media/MediaArtwork";
 import { api } from "../../services/api";
 import { extractVideoId } from "../../lib/helpers";
@@ -206,7 +204,7 @@ export const QueueItemRow: React.FC<QueueItemRowProps> = ({ item }) => {
         {isDownloading && (
           <button
             onClick={() => pauseItem(item.id)}
-            title="Pause download"
+            aria-label="Pause download" title="Pause download"
             className="w-8 h-8 rounded-xl glass-card flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-elevated transition-colors"
           >
             <Pause className="w-3.5 h-3.5" />
@@ -216,7 +214,7 @@ export const QueueItemRow: React.FC<QueueItemRowProps> = ({ item }) => {
         {isPaused && (
           <button
             onClick={() => resumeItem(item.id)}
-            title="Resume download"
+            aria-label="Resume download" title="Resume download"
             className="w-8 h-8 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary hover:bg-primary/30 transition-colors"
           >
             <Play className="w-3.5 h-3.5 fill-primary" />
@@ -227,7 +225,7 @@ export const QueueItemRow: React.FC<QueueItemRowProps> = ({ item }) => {
         {(isFailed || isCancelled) && (
           <button
             onClick={() => retryItem(item.id)}
-            title="Retry download"
+            aria-label="Retry download" title="Retry download"
             className="w-8 h-8 rounded-xl glass-card flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-elevated transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -248,7 +246,7 @@ export const QueueItemRow: React.FC<QueueItemRowProps> = ({ item }) => {
 
             <button
               onClick={handleOpenFolder}
-              title="Reveal in File Explorer"
+              aria-label="Reveal in File Explorer" title="Reveal in File Explorer"
               className="w-8 h-8 rounded-xl glass-card flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-elevated transition-colors"
             >
               <FolderOpen className="w-3.5 h-3.5" />
@@ -259,7 +257,7 @@ export const QueueItemRow: React.FC<QueueItemRowProps> = ({ item }) => {
         {/* Cancel / Remove Button */}
         <button
           onClick={() => (isCompleted || isFailed || isCancelled ? removeItem(item.id) : cancelItem(item.id))}
-          title={isCompleted ? "Remove from list" : "Cancel download"}
+          aria-label={isCompleted ? "Remove from list" : "Cancel download"} title={isCompleted ? "Remove from list" : "Cancel download"}
           className="w-8 h-8 rounded-xl glass-card flex items-center justify-center text-foreground-subtle hover:text-danger hover:border-danger/30 hover:bg-danger/10 transition-colors"
         >
           <X className="w-3.5 h-3.5" />

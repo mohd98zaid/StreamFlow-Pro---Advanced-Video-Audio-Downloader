@@ -79,8 +79,10 @@ class BackendApiAdapter:
 
         if "concurrent_downloads" in new_config:
             try:
-                concurrency = int(new_config["concurrent_downloads"])
-                self.downloader.max_concurrent = concurrency
+                concurrency = max(1, min(32, int(new_config["concurrent_downloads"])))
+                self.downloader.set_max_concurrent(concurrency)
+                if concurrency != new_config["concurrent_downloads"]:
+                    self.config_manager.set("concurrent_downloads", concurrency)
             except Exception as e:
                 logging.error(f"Error setting concurrency: {e}")
 
@@ -216,10 +218,16 @@ class BackendApiAdapter:
         template = os.path.join(target_dir, filename_pattern)
 
         items_to_add: List[DownloadItem] = []
+        validation_errors: List[str] = []
 
         for u in urls:
             u_clean = u.strip()
             if not u_clean:
+                continue
+
+            is_valid, validation_error = validate_url(u_clean)
+            if not is_valid:
+                validation_errors.append(f"{u_clean}: {validation_error}")
                 continue
 
             base_item = DownloadItem(
@@ -250,12 +258,16 @@ class BackendApiAdapter:
         self.event_bus.emit(Event.QUEUE_UPDATED, None)
         self.downloader.start_queue_processor()
 
-        return {
-            "success": True,
+        success = bool(added_items) or not validation_errors
+        response: Dict[str, Any] = {
+            "success": success,
             "added_count": len(added_items),
             "duplicate_count": duplicate_count,
             "items": added_items,
         }
+        if validation_errors:
+            response["error"] = "Invalid URL(s): " + "; ".join(validation_errors)
+        return response
 
     def get_queue(self) -> Dict[str, Any]:
         """Get snapshot of current download queue."""
@@ -268,6 +280,7 @@ class BackendApiAdapter:
         paused = sum(1 for i in items if i["status"] == "Paused")
         completed = sum(1 for i in items if i["status"] == "Completed")
         failed = sum(1 for i in items if i["status"] == "Failed")
+        cancelled = sum(1 for i in items if i["status"] == "Cancelled")
 
         return {
             "items": items,
@@ -278,49 +291,67 @@ class BackendApiAdapter:
                 "paused": paused,
                 "completed": completed,
                 "failed": failed,
+                "cancelled": cancelled,
             }
         }
 
     def pause_item(self, item_id: str) -> bool:
-        """Pause a specific download item."""
+        """Pause a specific download item without emitting while holding the queue lock."""
+        paused_item = None
         with self.downloader.download_queue.lock:
             for item in self.downloader.download_queue.items:
                 if item.id == item_id:
                     item.paused = True
                     item.status = DownloadStatus.PAUSED.value
                     item.speed = "Paused"
-                    self.event_bus.emit(Event.DOWNLOAD_PROGRESS, item)
-                    self.event_bus.emit(Event.QUEUE_UPDATED, None)
-                    return True
-        return False
+                    paused_item = item
+                    break
+
+        if paused_item is None:
+            return False
+
+        self.event_bus.emit(Event.DOWNLOAD_PROGRESS, paused_item)
+        self.event_bus.emit(Event.QUEUE_UPDATED, None)
+        return True
 
     def resume_item(self, item_id: str) -> bool:
-        """Resume a paused download item."""
+        """Resume a paused download item without emitting while holding the queue lock."""
+        resumed_item = None
         with self.downloader.download_queue.lock:
             for item in self.downloader.download_queue.items:
                 if item.id == item_id:
                     item.paused = False
                     item.status = DownloadStatus.QUEUED.value
                     item.speed = "Queued"
-                    self.event_bus.emit(Event.DOWNLOAD_PROGRESS, item)
-                    self.event_bus.emit(Event.QUEUE_UPDATED, None)
-                    self.downloader.start_queue_processor()
-                    return True
-        return False
+                    resumed_item = item
+                    break
+
+        if resumed_item is None:
+            return False
+
+        self.event_bus.emit(Event.DOWNLOAD_PROGRESS, resumed_item)
+        self.event_bus.emit(Event.QUEUE_UPDATED, None)
+        self.downloader.start_queue_processor()
+        return True
 
     def cancel_item(self, item_id: str) -> bool:
-        """Cancel a download item."""
+        """Cancel a download item without emitting while holding the queue lock."""
+        cancelled = False
         with self.downloader.download_queue.lock:
             for item in self.downloader.download_queue.items:
                 if item.id == item_id:
                     item.cancelled = True
                     item.status = DownloadStatus.CANCELLED.value
-                    self.event_bus.emit(Event.QUEUE_UPDATED, None)
-                    return True
-        return False
+                    cancelled = True
+                    break
+
+        if cancelled:
+            self.event_bus.emit(Event.QUEUE_UPDATED, None)
+        return cancelled
 
     def retry_item(self, item_id: str) -> bool:
-        """Retry a failed or cancelled item."""
+        """Retry a failed or cancelled item without emitting while holding the queue lock."""
+        retried = False
         with self.downloader.download_queue.lock:
             for item in self.downloader.download_queue.items:
                 if item.id == item_id:
@@ -329,10 +360,13 @@ class BackendApiAdapter:
                     item.status = DownloadStatus.QUEUED.value
                     item.paused = False
                     item.cancelled = False
-                    self.event_bus.emit(Event.QUEUE_UPDATED, None)
-                    self.downloader.start_queue_processor()
-                    return True
-        return False
+                    retried = True
+                    break
+
+        if retried:
+            self.event_bus.emit(Event.QUEUE_UPDATED, None)
+            self.downloader.start_queue_processor()
+        return retried
 
     def pause_all(self) -> int:
         """Pause all queued or downloading items."""
@@ -367,19 +401,19 @@ class BackendApiAdapter:
         return count
 
     def remove_item(self, item_id: str) -> bool:
-        """Remove an item completely from queue."""
+        """Remove an item completely from queue without emitting while holding the queue lock."""
+        removed = False
         with self.downloader.download_queue.lock:
-            target = None
             for item in self.downloader.download_queue.items:
                 if item.id == item_id:
-                    target = item
+                    item.cancelled = True
+                    self.downloader.download_queue.items.remove(item)
+                    removed = True
                     break
-            if target:
-                target.cancelled = True
-                self.downloader.download_queue.items.remove(target)
-                self.event_bus.emit(Event.QUEUE_UPDATED, None)
-                return True
-        return False
+
+        if removed:
+            self.event_bus.emit(Event.QUEUE_UPDATED, None)
+        return removed
 
     # --------------------------------------------------------------------------
     # HISTORY & STATS

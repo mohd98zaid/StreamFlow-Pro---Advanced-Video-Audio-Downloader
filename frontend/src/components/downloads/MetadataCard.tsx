@@ -1,5 +1,5 @@
 import React from "react";
-import { Play, User, Clock, Layers, Eye, Tv, Sparkles } from "lucide-react";
+import { User, Layers, Eye, Tv } from "lucide-react";
 import { useDownloadStore } from "../../stores/useDownloadStore";
 import { api } from "../../services/api";
 import { extractVideoId } from "../../lib/helpers";

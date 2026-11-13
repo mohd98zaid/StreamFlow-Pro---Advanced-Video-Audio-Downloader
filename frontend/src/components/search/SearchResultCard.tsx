@@ -1,5 +1,5 @@
 import React from "react";
-import { Play, Download, User, Eye, Tv } from "lucide-react";
+import { Download, User, Eye, Tv } from "lucide-react";
 import { SearchResult } from "../../types/download";
 import { api } from "../../services/api";
 import { useDownloadStore } from "../../stores/useDownloadStore";

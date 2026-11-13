@@ -6,8 +6,6 @@ import {
   Bell,
   Info,
   ExternalLink,
-  ShieldCheck,
-  Check,
   ChevronDown,
 } from "lucide-react";
 import { useSettingsStore } from "../stores/useSettingsStore";
@@ -19,8 +17,12 @@ export const SettingsPage: React.FC = () => {
   const toast = useToastStore();
 
   const handleUpdate = async (partial: any) => {
-    await updateConfig(partial);
-    toast.success("Preferences saved successfully", "Settings Updated");
+    try {
+      await updateConfig(partial);
+      toast.success("Preferences saved", "Settings Updated");
+    } catch (err: any) {
+      toast.error(err?.message || "We couldn't save that preference", "Settings Error");
+    }
   };
 
   return (

@@ -4,6 +4,51 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  background: rgb(var(--background));
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+body {
+  min-width: 960px;
+  min-height: 100dvh;
+  margin: 0;
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgb(var(--primary));
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-wrap: balance;
+}
+
 :root {
   /* Default Dark Mode Theme Tokens - Deep Luxury Media Workstation (RGB Triplets for full alpha support) */
   --background: 9 11 15;
@@ -97,6 +142,14 @@ select, input, textarea {
   border-color: rgba(0, 0, 0, 0.12);
 }
 
+/* Keep controls readable before persisted theme state finishes loading. */
+:root:not(.light) input:not([type="checkbox"]):not([type="radio"]),
+:root:not(.light) textarea {
+  background-color: #161C27;
+  color: #F8FAFC;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -124,12 +177,41 @@ select, input, textarea {
   background: rgba(0, 0, 0, 0.28);
 }
 
+/* Layered workstation canvas: a restrained texture keeps large surfaces from feeling flat. */
+.app-canvas {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 18% -10%, rgba(99, 102, 241, 0.12), transparent 34%),
+    radial-gradient(circle at 88% 110%, rgba(56, 189, 248, 0.08), transparent 30%),
+    rgb(var(--background));
+}
+
+.app-canvas::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  z-index: -1;
+  background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+
+.light .app-canvas {
+  background:
+    radial-gradient(circle at 18% -10%, rgba(79, 70, 229, 0.08), transparent 34%),
+    radial-gradient(circle at 88% 110%, rgba(2, 132, 199, 0.06), transparent 30%),
+    rgb(var(--background));
+}
+
 /* Glass Surface Utilities for YDS (Yuma Design System) */
 .glass-panel {
   background-color: var(--surface-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 18px 42px rgba(4, 7, 14, 0.16);
 }
 
 .glass-card {
@@ -137,6 +219,7 @@ select, input, textarea {
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border-glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 8px 22px rgba(4, 7, 14, 0.12);
 }
 
 .glass-pill {
@@ -244,4 +327,15 @@ select, input, textarea {
 .titlebar-no-drag {
   -webkit-app-region: no-drag;
   app-region: no-drag;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

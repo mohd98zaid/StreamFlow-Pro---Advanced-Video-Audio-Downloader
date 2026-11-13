@@ -69,7 +69,8 @@ def main():
     except ImportError:
         logging.warning("static-ffmpeg not installed; high-quality audio/video merge may fail.")
 
-    check_dependencies()
+    if not check_dependencies():
+        return 1
 
     # Route based on command-line argument if provided
     args = [a.lower() for a in sys.argv[1:]]
@@ -83,4 +84,4 @@ def main():
         run_modern.main()
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main() or 0)

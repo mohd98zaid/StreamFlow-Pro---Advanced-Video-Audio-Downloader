@@ -1,22 +1,19 @@
-import React, { useState, useEffect } from "react";
-import { Minus, Square, X, Sun, Moon, Radio, Sparkles } from "lucide-react";
+import React from "react";
+import { Minus, Square, X, Sun, Moon, Radio } from "lucide-react";
 import { useSettingsStore } from "../../stores/useSettingsStore";
 import { useQueueStore } from "../../stores/useQueueStore";
 
 export const Titlebar: React.FC = () => {
-  const { theme, setTheme } = useSettingsStore();
+  const { theme, setTheme, updateConfig } = useSettingsStore();
   const { summary } = useQueueStore();
-  const [isTauri, setIsTauri] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).__TAURI__) {
-      setIsTauri(true);
-    }
-  }, []);
+  const isTauri =
+    typeof window !== "undefined" &&
+    Boolean((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__);
 
   const toggleTheme = () => {
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
+    void updateConfig({ theme: nextTheme }).catch(() => undefined);
   };
 
   const handleMinimize = async () => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Search, Trash2, FolderOpen, RefreshCw, Film, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { Search, Trash2, FolderOpen, RefreshCw, Film, AlertTriangle } from "lucide-react";
 import { useHistoryStore } from "../stores/useHistoryStore";
 import { HistoryItemRow } from "../components/history/HistoryItemRow";
 import { DownloadItem } from "../types/download";
@@ -27,7 +27,7 @@ export const HistoryPage: React.FC = () => {
   useEffect(() => {
     fetchHistory();
     fetchStats();
-  }, []);
+  }, [fetchHistory, fetchStats]);
 
   const handleConfirmClear = async () => {
     await clearAll();

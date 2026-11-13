@@ -9,28 +9,37 @@ class WebSocketClient {
   private reconnectInterval = 2000;
   private isConnecting = false;
   private pingTimer: number | null = null;
+  private reconnectTimer: number | null = null;
+  private shouldReconnect = true;
 
   connect() {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
+    this.shouldReconnect = true;
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     this.isConnecting = true;
     try {
-      this.ws = new WebSocket(this.url);
+      const socket = new WebSocket(this.url);
+      this.ws = socket;
 
-      this.ws.onopen = () => {
+      socket.onopen = () => {
         this.isConnecting = false;
         // Start ping interval
         if (this.pingTimer) window.clearInterval(this.pingTimer);
         this.pingTimer = window.setInterval(() => {
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send("ping");
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send("ping");
           }
         }, 15000);
       };
 
-      this.ws.onmessage = (event) => {
+      socket.onmessage = (event) => {
         try {
           if (event.data === "pong") return;
           const envelope: WebSocketEnvelope = JSON.parse(event.data);
@@ -41,23 +50,35 @@ class WebSocketClient {
               console.error("Error in WS handler:", err);
             }
           });
-        } catch (e) {
+        } catch {
           // not JSON or ignored
         }
       };
 
-      this.ws.onclose = () => {
+      socket.onclose = () => {
         this.isConnecting = false;
         if (this.pingTimer) window.clearInterval(this.pingTimer);
-        setTimeout(() => this.connect(), this.reconnectInterval);
+        this.pingTimer = null;
+        if (this.ws === socket) this.ws = null;
+        if (this.shouldReconnect && this.ws === null && this.reconnectTimer === null) {
+          this.reconnectTimer = window.setTimeout(() => {
+            this.reconnectTimer = null;
+            this.connect();
+          }, this.reconnectInterval);
+        }
       };
 
-      this.ws.onerror = () => {
-        this.ws?.close();
+      socket.onerror = () => {
+        socket.close();
       };
-    } catch (err) {
+    } catch {
       this.isConnecting = false;
-      setTimeout(() => this.connect(), this.reconnectInterval);
+      if (this.shouldReconnect && this.reconnectTimer === null) {
+        this.reconnectTimer = window.setTimeout(() => {
+          this.reconnectTimer = null;
+          this.connect();
+        }, this.reconnectInterval);
+      }
     }
   }
 
@@ -69,7 +90,13 @@ class WebSocketClient {
   }
 
   disconnect() {
+    this.shouldReconnect = false;
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.pingTimer) window.clearInterval(this.pingTimer);
+    this.pingTimer = null;
     if (this.ws) {
       this.ws.close();
       this.ws = null;

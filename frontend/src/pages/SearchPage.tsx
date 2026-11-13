@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Tv, CheckCircle2, Sparkles, Film } from "lucide-react";
+import { Search, Tv, Film } from "lucide-react";
 import { SearchResult } from "../types/download";
 import { SearchResultCard } from "../components/search/SearchResultCard";
 import { api } from "../services/api";
@@ -51,8 +51,9 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onGoToQueue }) => {
       });
 
       if (addRes.success) {
-        toast.success(`Queued "${res.title}" for download!`, "Download Added");
+        toast.success(`Queued "${res.title}"`, "Download Added");
         fetchQueue();
+        onGoToQueue();
       } else {
         toast.error(addRes.error || "Failed to queue media item", "Queue Error");
       }

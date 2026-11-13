@@ -1,5 +1,5 @@
 import React from "react";
-import { Play, FolderOpen, Trash2, CheckCircle2, AlertCircle, Video, Music } from "lucide-react";
+import { Play, FolderOpen, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { DownloadItem } from "../../types/download";
 import { useHistoryStore } from "../../stores/useHistoryStore";
 import { MediaArtwork } from "../media/MediaArtwork";
@@ -99,7 +99,7 @@ export const HistoryItemRow: React.FC<HistoryItemRowProps> = ({ item }) => {
 
             <button
               onClick={() => openFolder(item.file_path!)}
-              title="Reveal in File Explorer"
+              aria-label="Reveal in File Explorer" title="Reveal in File Explorer"
               className="w-8 h-8 rounded-xl glass-card flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors"
             >
               <FolderOpen className="w-3.5 h-3.5" />
@@ -109,7 +109,7 @@ export const HistoryItemRow: React.FC<HistoryItemRowProps> = ({ item }) => {
 
         <button
           onClick={() => deleteItem(item.id)}
-          title="Remove from history"
+          aria-label="Remove from history" title="Remove from history"
           className="w-8 h-8 rounded-xl glass-card flex items-center justify-center text-foreground-subtle hover:text-danger hover:border-danger/30 hover:bg-danger/10 transition-colors"
         >
           <Trash2 className="w-3.5 h-3.5" />

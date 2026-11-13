@@ -5,10 +5,14 @@ import threading
 import ctypes
 import time
 import json
+import base64
+import html as html_lib
 import urllib.request
 import urllib.parse
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from xml.etree import ElementTree
 import webview
 import yt_dlp
 
@@ -35,6 +39,7 @@ active_window = None
 current_download_lock = threading.Lock()
 is_downloading = False
 _recs_cache = {}
+_lyrics_cache = {}
 
 def clean_track_info(title, artist=""):
     """Prunes raw YouTube junk from title/artist and extracts genuine track info"""
@@ -98,6 +103,381 @@ def clean_track_info(title, artist=""):
         a = "Original Artist"
 
     return t or raw_title, a
+
+
+# BitChord's lyrics repository is provider-first rather than LRCLIB-only. The
+# embedded player cannot load its React/extension stack, so the compatible
+# provider chain lives in the native bridge and returns the same useful
+# distinctions: word-timed, line-timed, or plain lyrics.
+LYRICS_PROVIDER_ORDER = (
+    "lrc-red",
+    "bini",
+    "better-lyrics",
+    "better-lyrics-portato",
+    "lyrics-plus",
+    "unison",
+    "lrclib",
+    "kugou",
+    "genius",
+)
+
+
+def _lyrics_get(url, timeout=5.0):
+    try:
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "StreamFlow-Pro/1.0",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.8",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            if not 200 <= response.status < 300:
+                return None
+            return response.read().decode("utf-8", errors="replace")
+    except Exception:
+        return None
+
+
+def _lyrics_url(base, **params):
+    query = urllib.parse.urlencode({key: value for key, value in params.items() if value not in (None, "")})
+    return f"{base}?{query}" if query else base
+
+
+def _lyrics_search_title(title):
+    """Match BitChord's removal of packaging/credit text before searching."""
+    value = str(title or "").strip()
+    patterns = (
+        r"\s*[([]\s*(feat|ft|featuring|with)\b[^)\]]*[)\]]",
+        r"\s+(feat|ft|featuring)\.?\s+.*$",
+        r"\s*[([]\s*(official\s*)?(music\s*)?(video|audio|visualizer|lyrics?\s*video|lyrics?|m/v|hd|hq|4k|full\s*song)\s*[)\]]",
+        r"\s*[([]\s*official\s*[)\]]",
+    )
+    for pattern in patterns:
+        value = re.sub(pattern, " ", value, flags=re.I)
+    value = re.sub(r"\s+", " ", value).strip().rstrip(",–—-").strip()
+    return value or str(title or "").strip()
+
+
+def _lyrics_search_artist(artist):
+    value = str(artist or "").strip()
+    return re.sub(r"\s+-\s+Topic$", "", value, flags=re.I).strip() or value
+
+
+def _lyrics_time_ms(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        if raw.endswith("ms"):
+            return int(float(raw[:-2]))
+        if raw.endswith("s"):
+            return int(float(raw[:-1]) * 1000)
+        parts = raw.split(":")
+        if len(parts) == 1:
+            return int(float(parts[0]) * 1000)
+        if len(parts) == 2:
+            return int((int(parts[0]) * 60 + float(parts[1])) * 1000)
+        if len(parts) == 3:
+            return int((int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])) * 1000)
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
+def _lrc_timestamp(ms):
+    total_seconds = max(0, int(ms)) / 1000
+    minutes = int(total_seconds // 60)
+    seconds = total_seconds - (minutes * 60)
+    return f"[{minutes:02d}:{seconds:05.2f}]"
+
+
+def _plain_from_lrc(lrc):
+    lines = []
+    for row in str(lrc or "").splitlines():
+        text = re.sub(r"\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]", "", row).strip()
+        if text and not re.match(r"^\[[A-Za-z]+:.*\]$", text):
+            lines.append(text)
+    return "\n".join(lines)
+
+
+def _ttml_to_lrc(document):
+    try:
+        root = ElementTree.fromstring(document)
+    except Exception:
+        return "", False
+
+    rows = []
+    word_timed = False
+    for element in root.iter():
+        if element.tag.rsplit("}", 1)[-1] != "p":
+            continue
+        text = "".join(element.itertext()).strip()
+        if not text:
+            continue
+        start = _lyrics_time_ms(element.attrib.get("begin"))
+        if start is None:
+            for child in element.iter():
+                start = _lyrics_time_ms(child.attrib.get("begin"))
+                if start is not None:
+                    word_timed = True
+                    break
+        if start is None:
+            continue
+        if any(_lyrics_time_ms(child.attrib.get("begin")) is not None for child in element.iter() if child is not element):
+            word_timed = True
+        rows.append((start, text))
+    rows.sort(key=lambda row: row[0])
+    return "\n".join(f"{_lrc_timestamp(start)}{text}" for start, text in rows), word_timed
+
+
+def _strip_html_text(document):
+    text = re.sub(r"<br\s*/?>", "\n", document, flags=re.I)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = html_lib.unescape(text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _normalise_lyrics_document(document):
+    """Return (synced LRC, plain text, word_synced) like BitChord's Parsed."""
+    if document is None:
+        return "", "", False
+    if isinstance(document, (dict, list)):
+        if isinstance(document, dict):
+            synced = document.get("syncedLyrics") or document.get("synced_lyrics") or document.get("lrc")
+            plain = document.get("plainLyrics") or document.get("plain_lyrics")
+            if synced:
+                synced_lrc, word = _normalise_lyrics_document(synced)
+                return synced_lrc, str(plain or _plain_from_lrc(synced_lrc)), word
+            for key in ("ttml", "ttmlContent", "lyrics", "content", "text", "data", "result", "response"):
+                if key in document:
+                    result = _normalise_lyrics_document(document[key])
+                    if result[0] or result[1]:
+                        return result
+            return "", "", False
+        for item in document:
+            result = _normalise_lyrics_document(item)
+            if result[0] or result[1]:
+                return result
+        return "", "", False
+
+    raw = str(document).replace("\ufeff", "").strip()
+    if not raw:
+        return "", "", False
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, (dict, list)):
+            return _normalise_lyrics_document(parsed)
+    except (TypeError, ValueError):
+        pass
+
+    if re.search(r"<tt(?:\s|>)|http://www\.w3\.org/ns/ttml", raw, flags=re.I):
+        lrc, word = _ttml_to_lrc(html_lib.unescape(raw))
+        return lrc, _plain_from_lrc(lrc), word
+    if re.search(r"^\s*\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]", raw, flags=re.M):
+        return raw, _plain_from_lrc(raw), False
+    if "<" in raw and ">" in raw:
+        raw = _strip_html_text(raw)
+    return "", raw, False
+
+
+def _lyrics_result(source, label, document):
+    synced, plain, word_synced = _normalise_lyrics_document(document)
+    if not synced and not plain:
+        return None
+    return {
+        "status": "success",
+        "source": source,
+        "provider": label,
+        "plain_lyrics": plain,
+        "synced_lyrics": synced,
+        "word_synced": word_synced,
+    }
+
+
+def _provider_lrc_red(title, artist, duration):
+    body = _lyrics_get(_lyrics_url("https://lrc.red/search.json", q=f"{title} {artist}"))
+    try:
+        hits = json.loads(body or "{}").get("hits", [])
+    except (TypeError, ValueError):
+        return None
+    wanted = title.casefold()
+    seconds = duration if duration and duration > 0 else 0
+    candidates = [
+        hit for hit in hits
+        if hit.get("isrc") and hit.get("title") and wanted in str(hit.get("title", "")).casefold()
+        and (not seconds or not hit.get("duration") or abs(float(hit["duration"]) - seconds) <= 3)
+    ]
+    candidates.sort(key=lambda hit: abs(float(hit.get("duration", seconds)) - seconds) if seconds else 0)
+    for hit in candidates:
+        isrc = re.sub(r"[^A-Za-z0-9]", "", str(hit.get("isrc", "")).upper())
+        if re.fullmatch(r"[A-Z]{2}[A-Z0-9]{3}\d{7}", isrc):
+            document = _lyrics_get(f"https://lrc.red/s/{isrc}.ttml")
+            result = _lyrics_result("lrc-red", "lrc.red", document)
+            if result:
+                return result
+    return None
+
+
+def _provider_bini(title, artist, duration):
+    body = _lyrics_get(_lyrics_url("https://lyrics-api.binimum.org/", track=title, artist=artist, duration=duration or None))
+    try:
+        found = (json.loads(body or "{}").get("results") or [None])[0]
+    except (TypeError, ValueError, IndexError):
+        found = None
+    url = found.get("lyricsUrl") if isinstance(found, dict) else None
+    return _lyrics_result("bini", "BiniLyrics", _lyrics_get(url)) if url else None
+
+
+def _provider_better_lyrics(title, artist, duration, portato=False):
+    endpoint = "https://lyrics-api.boidu.dev/qq/getLyrics" if portato else "https://lyrics-api.boidu.dev/getLyrics"
+    document = _lyrics_get(_lyrics_url(endpoint, s=title, a=artist, d=duration or None))
+    return _lyrics_result("better-lyrics-portato" if portato else "better-lyrics", "BetterLyrics Portato" if portato else "BetterLyrics", document)
+
+
+def _provider_lyrics_plus(title, artist, duration):
+    for host in ("https://lyricsplus.prjktla.my.id", "https://lyricsplus.binimum.org"):
+        body = _lyrics_get(_lyrics_url(f"{host}/v2/lyrics/get", title=title, artist=artist, duration=duration or None))
+        try:
+            payload = json.loads(body or "{}")
+        except (TypeError, ValueError):
+            continue
+        rows = []
+        for row in payload.get("lyrics", []) if isinstance(payload, dict) else []:
+            if not isinstance(row, dict) or not isinstance(row.get("time"), (int, float)):
+                continue
+            text = str(row.get("text") or "").strip()
+            if text:
+                rows.append(f"{_lrc_timestamp(row['time'])}{text}")
+        result = _lyrics_result("lyrics-plus", "LyricsPlus", "\n".join(rows))
+        if result:
+            return result
+    return None
+
+
+def _provider_unison(title, artist, duration):
+    body = _lyrics_get(_lyrics_url("https://unison.boidu.dev/lyrics", song=title, artist=artist, duration=duration or None))
+    return _lyrics_result("unison", "Unison", body)
+
+
+def _provider_lrclib(title, artist, duration):
+    exact = _lyrics_get(_lyrics_url("https://lrclib.net/api/get", track_name=title, artist_name=artist, duration=duration or None))
+    result = _lyrics_result("lrclib", "LRCLIB", exact)
+    if result:
+        return result
+    body = _lyrics_get(_lyrics_url("https://lrclib.net/api/search", track_name=title, artist_name=artist))
+    try:
+        hits = json.loads(body or "[]")
+    except (TypeError, ValueError):
+        return None
+    hits = [hit for hit in hits if isinstance(hit, dict) and (hit.get("syncedLyrics") or hit.get("plainLyrics"))]
+    hits.sort(key=lambda hit: abs(float(hit.get("duration", duration or 0)) - (duration or 0)))
+    return _lyrics_result("lrclib", "LRCLIB", hits[0] if hits else None)
+
+
+def _provider_kugou(title, artist, duration):
+    keyword = f"{title} - {artist}".strip(" -")
+    body = _lyrics_get(_lyrics_url("https://mobileservice.kugou.com/api/v3/search/song", version=9108, plat=0, pagesize=8, showtype=0, keyword=keyword))
+    try:
+        songs = json.loads(body or "{}").get("data", {}).get("info", [])
+    except (TypeError, ValueError):
+        return None
+    seconds = duration or 0
+    songs = [song for song in songs if not seconds or not song.get("duration") or abs(float(song["duration"]) - seconds) <= 8]
+    songs.sort(key=lambda song: abs(float(song.get("duration", seconds)) - seconds) if seconds else 0)
+    for song in songs:
+        search = _lyrics_get(_lyrics_url("https://lyrics.kugou.com/search", ver=1, man="yes", client="pc", hash=song.get("hash")))
+        try:
+            candidate = (json.loads(search or "{}").get("candidates") or [None])[0]
+        except (TypeError, ValueError, IndexError):
+            candidate = None
+        if not candidate:
+            continue
+        downloaded = _lyrics_get(_lyrics_url("https://lyrics.kugou.com/download", fmt="lrc", charset="utf8", client="pc", ver=1, id=candidate.get("id"), accesskey=candidate.get("accesskey")))
+        try:
+            encoded = json.loads(downloaded or "{}").get("content")
+            lrc = base64.b64decode(encoded).decode("utf-8", errors="replace") if encoded else ""
+        except (TypeError, ValueError, KeyError):
+            lrc = ""
+        result = _lyrics_result("kugou", "KuGou", lrc)
+        if result and not re.search(r"纯音乐.*欣赏", result["plain_lyrics"]):
+            return result
+    return None
+
+
+def _provider_genius(title, artist):
+    body = _lyrics_get(_lyrics_url("https://genius.com/api/search/multi", q=f"{artist} {title}"), timeout=6.0)
+    try:
+        sections = json.loads(body or "{}").get("response", {}).get("sections", [])
+        hits = next((section.get("hits", []) for section in sections if section.get("type") == "song"), [])
+    except (TypeError, ValueError):
+        return None
+    wanted_title = title.casefold()
+    wanted_artist = artist.casefold()
+    scored = []
+    for entry in hits:
+        result = entry.get("result", {}) if isinstance(entry, dict) else {}
+        hit_title = str(result.get("title", ""))
+        hit_artist = str(result.get("artist_names", ""))
+        score = (50 if hit_title.casefold() == wanted_title else 25 if wanted_title in hit_title.casefold() else 0)
+        score += 40 if hit_artist.casefold() == wanted_artist else 20 if wanted_artist in hit_artist.casefold() else 0
+        if score and result.get("url"):
+            scored.append((score, result["url"]))
+    for _, url in sorted(scored, reverse=True):
+        page = _lyrics_get(url, timeout=6.0)
+        if not page:
+            continue
+        containers = re.findall(r'<div[^>]+data-lyrics-container="true"[^>]*>(.*?)</div>', page, flags=re.I | re.S)
+        if not containers:
+            containers = re.findall(r'<div[^>]*class="lyrics"[^>]*>(.*?)</div>', page, flags=re.I | re.S)
+        text = "\n".join(_strip_html_text(container) for container in containers).strip()
+        result = _lyrics_result("genius", "Genius", text)
+        if result:
+            return result
+    return None
+
+
+def _lookup_lyrics(title, artist, duration):
+    title = _lyrics_search_title(title)
+    artist = _lyrics_search_artist(artist)
+    providers = {
+        "lrc-red": lambda: _provider_lrc_red(title, artist, duration),
+        "bini": lambda: _provider_bini(title, artist, duration),
+        "better-lyrics": lambda: _provider_better_lyrics(title, artist, duration),
+        "better-lyrics-portato": lambda: _provider_better_lyrics(title, artist, duration, True),
+        "lyrics-plus": lambda: _provider_lyrics_plus(title, artist, duration),
+        "unison": lambda: _provider_unison(title, artist, duration),
+        "lrclib": lambda: _provider_lrclib(title, artist, duration),
+        "kugou": lambda: _provider_kugou(title, artist, duration),
+        "genius": lambda: _provider_genius(title, artist),
+    }
+    results = {}
+    with ThreadPoolExecutor(max_workers=len(providers)) as pool:
+        futures = {pool.submit(providers[source]): source for source in providers}
+        for future in as_completed(futures):
+            source = futures[future]
+            try:
+                result = future.result()
+                if result:
+                    results[source] = result
+            except Exception:
+                continue
+
+    plain = None
+    line_synced = None
+    for source in LYRICS_PROVIDER_ORDER:
+        result = results.get(source)
+        if not result:
+            continue
+        result["synced"] = bool(result.get("synced_lyrics"))
+        if result.get("word_synced"):
+            return result
+        if result["synced"]:
+            line_synced = line_synced or result
+        else:
+            plain = plain or result
+    return line_synced or plain
 
 
 class PlayerApi:
@@ -171,6 +551,35 @@ class PlayerApi:
                 pass
         threading.Thread(target=_bg, daemon=True).start()
         return True
+
+    def get_lyrics(self, title="", artist="", duration=None):
+        """Run BitChord's prioritized multi-provider lyrics lookup."""
+        global _lyrics_cache
+        track_name = str(title or "").strip()[:180]
+        artist_name = str(artist or "").strip()[:180]
+        if not track_name:
+            return {"status": "empty", "message": "Play a track to load lyrics."}
+
+        duration_seconds = 0
+        try:
+            duration_seconds = max(0, int(float(duration or 0)))
+        except (TypeError, ValueError):
+            pass
+        key = (track_name.casefold(), artist_name.casefold(), duration_seconds)
+        now = time.time()
+        cached = _lyrics_cache.get(key)
+        if cached and now - cached["time"] < 900:
+            return cached["data"]
+
+        try:
+            result = _lookup_lyrics(track_name, artist_name, duration_seconds)
+            if not result:
+                result = {"status": "not_found", "message": "None of the lyric providers has this song."}
+        except Exception:
+            result = {"status": "not_found", "message": "Lyrics are unavailable for this track."}
+
+        _lyrics_cache[key] = {"time": now, "data": result}
+        return result
 
     def get_song_recommendations(self, video_id=None, query=None):
         """Fetch high quality music recommendations based on current video ID and title/artist"""
@@ -1982,6 +2391,412 @@ STUDIO_MUSIC_CSS = """/* =======================================================
     .ag-sm-brand-icon span, .ag-sm-live-eq span { animation: none !important; }
     .ag-sm-dac-led { animation: none !important; }
 }
+
+/* --------------------------------------------------------------------------
+   BitChord-inspired player pass
+   Keep the existing player hooks, but use a quieter Apple Music-like system:
+   one strong artwork column, a calm Up Next list, and fewer competing effects.
+   -------------------------------------------------------------------------- */
+#antigravity-studio-music {
+    --ambient-bg: #0b0b0d;
+    --ambient-color-1: rgba(110, 72, 52, 0.22);
+    --ambient-color-2: rgba(38, 62, 104, 0.24);
+    --yuma-accent: #57b9e8;
+    --text-main: rgba(255, 255, 255, 0.95);
+    --text-sub: rgba(255, 255, 255, 0.62);
+    --text-muted: rgba(255, 255, 255, 0.4);
+    background: #0b0b0d !important;
+    background-image:
+        radial-gradient(circle at 10% 25%, rgba(130, 78, 53, 0.16), transparent 34%),
+        radial-gradient(circle at 88% 80%, rgba(40, 70, 130, 0.2), transparent 42%) !important;
+}
+
+#antigravity-studio-music .ag-sm-ambient-mesh::before,
+#antigravity-studio-music .ag-sm-ambient-mesh::after {
+    filter: blur(110px);
+    opacity: 0.6;
+}
+
+#antigravity-studio-music .ag-sm-header {
+    height: 68px;
+    padding: 0 24px;
+    background: rgba(13, 13, 16, 0.78);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+#antigravity-studio-music .ag-sm-header-left,
+#antigravity-studio-music .ag-sm-header-right {
+    min-width: 0;
+}
+
+#antigravity-studio-music .ag-sm-brand {
+    gap: 10px;
+}
+
+#antigravity-studio-music .ag-sm-brand-text {
+    font-size: 16px;
+    letter-spacing: -0.55px;
+}
+
+#antigravity-studio-music .ag-sm-search-capsule {
+    width: min(440px, 42vw);
+    height: 38px;
+    background: rgba(118, 118, 128, 0.16);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+#antigravity-studio-music .ag-sm-search-capsule:focus-within {
+    width: min(500px, 48vw);
+    background: rgba(118, 118, 128, 0.23);
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow: none;
+}
+
+#antigravity-studio-music .ag-sm-content-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 34vw);
+    min-height: 0;
+}
+
+#antigravity-studio-music .ag-sm-left-player {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    min-width: 0;
+    padding: clamp(22px, 4vh, 48px) clamp(24px, 3vw, 52px) 24px;
+    gap: 20px;
+    background: rgba(10, 10, 13, 0.5);
+    border-right: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#antigravity-studio-music .ag-sm-art-wrap {
+    min-height: 0;
+    padding: 0 18px;
+}
+
+#antigravity-studio-music .ag-sm-art-container {
+    width: min(30vw, 330px);
+    height: min(30vw, 330px);
+    max-width: 100%;
+    max-height: 42vh;
+}
+
+#antigravity-studio-music .ag-sm-vinyl-disc {
+    opacity: 0.7;
+    right: -12px;
+}
+
+#antigravity-studio-music .ag-sm-art-sleeve,
+#antigravity-studio-music .ag-sm-art-img {
+    border-radius: 12px;
+}
+
+#antigravity-studio-music .ag-sm-art-sleeve {
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.56), 0 0 28px -10px var(--ambient-color-1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+#antigravity-studio-music .ag-sm-info-row {
+    padding: 0 2px;
+}
+
+#antigravity-studio-music .ag-sm-hero-title {
+    font-size: clamp(18px, 2vw, 24px);
+    line-height: 1.15;
+    letter-spacing: -0.55px;
+}
+
+#antigravity-studio-music .ag-sm-hero-artist {
+    font-size: 13px;
+}
+
+#antigravity-studio-music .ag-sm-badge-capsule {
+    padding: 5px 12px;
+    font-size: 9px;
+    letter-spacing: 0.4px;
+}
+
+#antigravity-studio-music .ag-sm-transport-capsule {
+    gap: 18px;
+    padding: 5px 20px;
+    background: rgba(118, 118, 128, 0.18);
+    border-color: rgba(255, 255, 255, 0.17);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.14);
+}
+
+#antigravity-studio-music .ag-sm-flank-btn {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border-color: transparent;
+}
+
+#antigravity-studio-music .ag-sm-flank-btn.active {
+    color: var(--yuma-accent);
+    background: rgba(87, 185, 232, 0.12);
+    border-color: rgba(87, 185, 232, 0.28);
+}
+
+#antigravity-studio-music .ag-sm-deck-utilities {
+    padding-top: 12px;
+    border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+#antigravity-studio-music .ag-sm-right-stage {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    padding: 18px 24px 30px;
+    gap: 14px;
+    background: rgba(17, 17, 20, 0.2);
+}
+
+#antigravity-studio-music .ag-sm-panel-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background: rgba(118, 118, 128, 0.12);
+}
+
+#antigravity-studio-music .ag-sm-panel-tab {
+    min-width: 92px;
+    border: 0;
+    border-radius: 7px;
+    padding: 7px 14px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.52);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+#antigravity-studio-music .ag-sm-panel-tab:hover,
+#antigravity-studio-music .ag-sm-panel-tab[aria-selected="true"] {
+    background: rgba(255, 255, 255, 0.92);
+    color: #151519;
+}
+
+#antigravity-studio-music .ag-sm-next-panel,
+#antigravity-studio-music .ag-sm-lyrics-panel {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+#antigravity-studio-music .ag-sm-lyrics-panel[hidden] {
+    display: none;
+}
+
+#antigravity-studio-music .ag-sm-lyrics-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+#antigravity-studio-music .ag-sm-lyrics-status {
+    color: rgba(255, 255, 255, 0.43);
+    font-size: 11px;
+    text-align: right;
+}
+
+#antigravity-studio-music .ag-sm-lyrics-scroll {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 4px 32px;
+    scrollbar-width: thin;
+}
+
+#antigravity-studio-music .ag-sm-lyrics-line {
+    margin: 0;
+    padding: 7px 12px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: clamp(18px, 2vw, 27px);
+    font-weight: 700;
+    line-height: 1.22;
+    letter-spacing: -0.6px;
+    transition: color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+#antigravity-studio-music .ag-sm-lyrics-line.is-active {
+    color: #ffffff;
+    transform: translateX(4px);
+}
+
+#antigravity-studio-music .ag-sm-lyrics-empty {
+    margin: 0;
+    padding: 24px 12px;
+    color: rgba(255, 255, 255, 0.54);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+#antigravity-studio-music .ag-sm-chips-row {
+    gap: 8px;
+}
+
+#antigravity-studio-music .ag-sm-chip {
+    padding: 8px 18px !important;
+    border-radius: 999px !important;
+    background: rgba(118, 118, 128, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.68) !important;
+}
+
+#antigravity-studio-music .ag-sm-chip.active {
+    background: #f7f7f8 !important;
+    color: #17171a !important;
+    border-color: #f7f7f8 !important;
+    box-shadow: none !important;
+}
+
+#antigravity-studio-music .ag-sm-sec-header {
+    margin-top: 4px;
+    margin-bottom: 2px;
+}
+
+#antigravity-studio-music .ag-sm-sec-title {
+    font-size: 22px;
+    letter-spacing: -0.7px;
+}
+
+#antigravity-studio-music .ag-sm-sec-sub {
+    font-size: 12px;
+}
+
+#antigravity-studio-music .ag-sm-queue-list {
+    gap: 7px;
+    min-height: 0;
+}
+
+#antigravity-studio-music .ag-sm-card {
+    min-height: 62px;
+    padding: 8px 12px;
+    gap: 12px;
+    border-radius: 14px;
+    background: rgba(118, 118, 128, 0.08);
+    border-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+}
+
+#antigravity-studio-music .ag-sm-card:hover {
+    transform: translateX(2px);
+    background: rgba(118, 118, 128, 0.16);
+    border-color: rgba(255, 255, 255, 0.17);
+    box-shadow: none;
+}
+
+#antigravity-studio-music .ag-sm-card.active-playing {
+    background: linear-gradient(90deg, rgba(53, 142, 186, 0.22), rgba(118, 118, 128, 0.08));
+    border-color: rgba(87, 185, 232, 0.62);
+    box-shadow: 0 0 0 1px rgba(87, 185, 232, 0.14);
+}
+
+#antigravity-studio-music .ag-sm-card-thumb {
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+}
+
+#antigravity-studio-music .ag-sm-card-title {
+    font-size: 14px;
+}
+
+#antigravity-studio-music .ag-sm-card-artist,
+#antigravity-studio-music .ag-sm-card-dur {
+    font-size: 12px;
+}
+
+#antigravity-studio-music .ag-sm-card-dl-btn {
+    padding: 5px 9px;
+    border-radius: 8px;
+    background: transparent;
+    border-color: transparent;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#antigravity-studio-music .ag-sm-card-dl-btn:hover {
+    background: rgba(255, 255, 255, 0.13);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+#antigravity-studio-music .ag-sm-sheet-btn.active {
+    color: #151519;
+    background: #f7f7f8;
+    border-color: #f7f7f8;
+}
+
+@media (max-width: 900px) {
+    #antigravity-studio-music .ag-sm-header {
+        padding: 0 14px;
+    }
+
+    #antigravity-studio-music .ag-sm-header-center {
+        display: none;
+    }
+
+    #antigravity-studio-music .ag-sm-content-stage {
+        grid-template-columns: minmax(300px, 42vw) minmax(0, 1fr);
+    }
+
+    #antigravity-studio-music .ag-sm-left-player {
+        grid-column: 2;
+    }
+
+    #antigravity-studio-music .ag-sm-right-stage {
+        grid-column: 1;
+    }
+
+    #antigravity-studio-music .ag-sm-right-stage {
+        padding-inline: 14px;
+    }
+
+    #antigravity-studio-music .ag-sm-card-dl-btn span {
+        display: none;
+    }
+}
+
+@media (max-width: 680px) {
+    #antigravity-studio-music .ag-sm-header-right .ag-sm-hdr-btn span {
+        display: none;
+    }
+
+    #antigravity-studio-music .ag-sm-content-stage {
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    #antigravity-studio-music .ag-sm-left-player {
+        order: 1;
+        min-height: min(620px, 72vh);
+        flex: none;
+        border-left: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-block: 20px;
+    }
+
+    #antigravity-studio-music .ag-sm-art-container {
+        width: min(64vw, 300px);
+        height: min(64vw, 300px);
+    }
+
+    #antigravity-studio-music .ag-sm-right-stage {
+        order: 2;
+        flex: none;
+        min-height: 420px;
+    }
+}
 """
 
 CINEMA_JS = r"""
@@ -2842,7 +3657,7 @@ CINEMA_JS = r"""
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                     <span>Download MP3</span>
                                 </button>
-                                <button class="ag-sm-sheet-btn" id="agSmLyricsBtn" title="Lyrics">
+                                <button class="ag-sm-sheet-btn" id="agSmLyricsBtn" title="Show lyrics" aria-label="Show lyrics" aria-pressed="false">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                                 </button>
                             </div>
@@ -2872,24 +3687,30 @@ CINEMA_JS = r"""
                             </div>
                         </div>
 
-                        <!-- Mood Filter Chips -->
-                        <div class="ag-sm-chips-row">
-                            <button class="ag-sm-chip active" data-query="">All Recommendations</button>
-                            <button class="ag-sm-chip" data-query="energize high energy electronic dance music">Energize</button>
-                            <button class="ag-sm-chip" data-query="feel good positive acoustic pop vibes">Feel good</button>
-                            <button class="ag-sm-chip" data-query="relax lo-fi chillout ambient beats">Relax</button>
-                            <button class="ag-sm-chip" data-query="workout gym cardio phonk motivational beats">Workout</button>
-                            <button class="ag-sm-chip" data-query="deep focus ambient electronic study mix">Focus</button>
+                        <div class="ag-sm-panel-tabs" role="tablist" aria-label="Player side panel">
+                            <button class="ag-sm-panel-tab" id="agSmUpNextTab" role="tab" aria-selected="true" aria-controls="agSmUpNextPanel">Up Next</button>
+                            <button class="ag-sm-panel-tab" id="agSmLyricsTab" role="tab" aria-selected="false" aria-controls="agSmLyricsPanel">Lyrics</button>
                         </div>
 
-                        <!-- Section Header -->
-                        <div class="ag-sm-sec-header">
-                            <div class="ag-sm-sec-title">Up Next</div>
-                            <div class="ag-sm-sec-sub" id="agSmRecSubtitle">Continuous playback</div>
-                        </div>
+                        <div class="ag-sm-next-panel" id="agSmUpNextPanel" role="tabpanel" aria-labelledby="agSmUpNextTab">
+                            <!-- Mood Filter Chips -->
+                            <div class="ag-sm-chips-row">
+                                <button class="ag-sm-chip active" data-query="">All Recommendations</button>
+                                <button class="ag-sm-chip" data-query="energize high energy electronic dance music">Energize</button>
+                                <button class="ag-sm-chip" data-query="feel good positive acoustic pop vibes">Feel good</button>
+                                <button class="ag-sm-chip" data-query="relax lo-fi chillout ambient beats">Relax</button>
+                                <button class="ag-sm-chip" data-query="workout gym cardio phonk motivational beats">Workout</button>
+                                <button class="ag-sm-chip" data-query="deep focus ambient electronic study mix">Focus</button>
+                            </div>
 
-                        <!-- Up Next Cards List -->
-                        <div class="ag-sm-queue-list" id="agSmRelatedList">
+                            <!-- Section Header -->
+                            <div class="ag-sm-sec-header">
+                                <div class="ag-sm-sec-title">Up Next</div>
+                                <div class="ag-sm-sec-sub" id="agSmRecSubtitle">Tailored to YouTube Music</div>
+                            </div>
+
+                            <!-- Up Next Cards List -->
+                            <div class="ag-sm-queue-list" id="agSmRelatedList">
                             <div class="ag-sm-card active-playing">
                                 <div class="ag-sm-card-index">
                                     <div class="ag-sm-live-eq"><span></span><span></span><span></span><span></span></div>
@@ -2958,6 +3779,20 @@ CINEMA_JS = r"""
                                     <button class="ag-sm-card-dl-btn" data-action="dl" title="Download MP3"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>MP3</span></button>
                                 </div>
                             </div>
+                            </div>
+                        </div>
+
+                        <div class="ag-sm-lyrics-panel" id="agSmLyricsPanel" role="tabpanel" aria-labelledby="agSmLyricsTab" hidden>
+                            <div class="ag-sm-lyrics-heading">
+                                <div>
+                                    <div class="ag-sm-sec-title">Lyrics</div>
+                                    <div class="ag-sm-sec-sub">Synced to the current track when available</div>
+                                </div>
+                                <div class="ag-sm-lyrics-status" id="agSmLyricsStatus">Select Lyrics to load</div>
+                            </div>
+                            <div class="ag-sm-lyrics-scroll" id="agSmLyricsContent" aria-live="polite">
+                                <p class="ag-sm-lyrics-empty">Lyrics are off. Select this panel to search for lyrics.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2973,10 +3808,20 @@ CINEMA_JS = r"""
         var isStudioActive = safeGetStorage('ag_studio_active') === '1';
         var isFetchingRecs = false;
         var lastVId = '';
+        var studioQueue = [];
+        var studioQueueIndex = -1;
+        var studioShuffle = false;
+        var studioRepeat = 'off';
         var visRunning = false;
         var audioCtx = null;
         var eqFilters = [];
         var sleepTimerId = null;
+        var lyricsPanelMode = 'up-next';
+        var lyricsTrackKey = '';
+        var lyricsLines = [];
+        var lyricsActiveIndex = -2;
+        var lyricsRequestPending = false;
+        var lyricsRequestFinished = false;
 
         function formatTime(seconds) {
             if (isNaN(seconds) || seconds < 0) return '0:00';
@@ -3041,6 +3886,159 @@ CINEMA_JS = r"""
                 a = 'Original Artist';
             }
             return a;
+        }
+
+        function escapeLyricsText(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function parseLyrics(raw, synced) {
+            const text = String(raw || '').replace(/\r/g, '').trim();
+            if (!text) return [];
+            if (!synced) {
+                return text.split('\n').map((line) => ({ time: -1, text: line.trim() })).filter((line) => line.text);
+            }
+
+            const parsed = [];
+            text.split('\n').forEach((line) => {
+                const timestamps = [];
+                const matcher = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+                let match;
+                while ((match = matcher.exec(line)) !== null) {
+                    const fraction = String(match[3] || '0');
+                    const milliseconds = fraction.length === 1 ? Number(fraction) * 100 : fraction.length === 2 ? Number(fraction) * 10 : Number(fraction);
+                    timestamps.push(Number(match[1]) * 60 + Number(match[2]) + milliseconds / 1000);
+                }
+                const lyricText = line.replace(/\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]/g, '').trim();
+                if (lyricText) timestamps.forEach((time) => parsed.push({ time, text: lyricText }));
+            });
+            return parsed.sort((a, b) => a.time - b.time);
+        }
+
+        function renderLyricsLines(currentTime) {
+            const content = document.getElementById('agSmLyricsContent');
+            if (!content || !lyricsLines.length) return;
+
+            let activeIndex = -1;
+            if (lyricsLines.some((line) => line.time >= 0)) {
+                lyricsLines.forEach((line, index) => {
+                    if (line.time >= 0 && line.time <= currentTime) activeIndex = index;
+                });
+            }
+            if (activeIndex === lyricsActiveIndex && content.dataset.rendered === '1') return;
+            lyricsActiveIndex = activeIndex;
+            content.dataset.rendered = '1';
+            setSafeHTML(content, lyricsLines.map((line, index) =>
+                `<p class="ag-sm-lyrics-line${index === activeIndex ? ' is-active' : ''}">${escapeLyricsText(line.text)}</p>`
+            ).join(''));
+            const activeLine = content.querySelector('.ag-sm-lyrics-line.is-active');
+            if (activeLine && activeIndex >= 0) {
+                activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function setLyricsMessage(message) {
+            const content = document.getElementById('agSmLyricsContent');
+            if (!content) return;
+            content.dataset.rendered = '0';
+            setSafeHTML(content, `<p class="ag-sm-lyrics-empty">${escapeLyricsText(message)}</p>`);
+        }
+
+        function receiveLyricsResult(result, trackKey) {
+            if (trackKey !== lyricsTrackKey) return;
+            lyricsRequestPending = false;
+            lyricsRequestFinished = true;
+            let data = result;
+            if (typeof data === 'string') {
+                try { data = JSON.parse(data); } catch(e) { data = null; }
+            }
+            const status = document.getElementById('agSmLyricsStatus');
+            if (!data || data.status !== 'success') {
+                lyricsLines = [];
+                lyricsActiveIndex = -2;
+                if (status) status.textContent = 'Not available';
+                setLyricsMessage(data && data.message ? data.message : 'Lyrics are unavailable for this track.');
+                return;
+            }
+
+            const synced = String(data.synced_lyrics || '').trim();
+            const plain = String(data.plain_lyrics || '').trim();
+            lyricsLines = parseLyrics(synced || plain, Boolean(synced));
+            lyricsActiveIndex = -2;
+            const provider = String(data.provider || data.source || 'Lyrics');
+            if (status) status.textContent = synced ? `${provider} · synced` : `${provider} · plain text`;
+            if (!lyricsLines.length) {
+                setLyricsMessage('No lyrics found for this track.');
+                return;
+            }
+            setLyricsMessage('');
+            renderLyricsLines(document.querySelector('video')?.currentTime || 0);
+        }
+
+        function loadLyricsForCurrentTrack(title, artist, duration) {
+            if (lyricsPanelMode !== 'lyrics' || !title || title === 'Unknown Title') return;
+            const trackKey = `${title}|${artist}`;
+            if (trackKey === lyricsTrackKey && (lyricsRequestPending || lyricsRequestFinished)) return;
+            lyricsTrackKey = trackKey;
+            lyricsLines = [];
+            lyricsActiveIndex = -2;
+            lyricsRequestPending = true;
+            lyricsRequestFinished = false;
+            const status = document.getElementById('agSmLyricsStatus');
+            if (status) status.textContent = 'Searching…';
+            setLyricsMessage('Searching lyrics for this track…');
+
+            const bridge = window.pywebview && window.pywebview.api;
+            if (bridge && typeof bridge.get_lyrics === 'function') {
+                Promise.resolve(bridge.get_lyrics(title, artist, Number.isFinite(duration) ? duration : null))
+                    .then((result) => receiveLyricsResult(result, trackKey))
+                    .catch(() => receiveLyricsResult({ status: 'not_found', message: 'Lyrics are unavailable for this track.' }, trackKey));
+                return;
+            }
+
+            const params = new URLSearchParams({ track_name: title });
+            if (artist && artist !== 'Original Artist') params.set('artist_name', artist);
+            fetch(`https://lrclib.net/api/get?${params.toString()}`)
+                .then((response) => response.ok ? response.json() : Promise.reject(new Error('lyrics unavailable')))
+                .then((result) => receiveLyricsResult({
+                    status: 'success',
+                    source: 'LRCLIB',
+                    plain_lyrics: result.plainLyrics,
+                    synced_lyrics: result.syncedLyrics,
+                }, trackKey))
+                .catch(() => receiveLyricsResult({ status: 'not_found', message: 'Lyrics are unavailable for this track.' }, trackKey));
+        }
+
+        function showStudioPanel(panel) {
+            lyricsPanelMode = panel === 'lyrics' ? 'lyrics' : 'up-next';
+            const nextPanel = document.getElementById('agSmUpNextPanel');
+            const lyricsPanel = document.getElementById('agSmLyricsPanel');
+            const nextTab = document.getElementById('agSmUpNextTab');
+            const lyricsTab = document.getElementById('agSmLyricsTab');
+            const lyricsButton = document.getElementById('agSmLyricsBtn');
+            if (nextPanel) nextPanel.hidden = lyricsPanelMode !== 'up-next';
+            if (lyricsPanel) lyricsPanel.hidden = lyricsPanelMode !== 'lyrics';
+            if (nextTab) nextTab.setAttribute('aria-selected', String(lyricsPanelMode === 'up-next'));
+            if (lyricsTab) lyricsTab.setAttribute('aria-selected', String(lyricsPanelMode === 'lyrics'));
+            if (lyricsButton) {
+                lyricsButton.classList.toggle('active', lyricsPanelMode === 'lyrics');
+                lyricsButton.setAttribute('aria-pressed', String(lyricsPanelMode === 'lyrics'));
+                lyricsButton.title = lyricsPanelMode === 'lyrics' ? 'Hide lyrics' : 'Show lyrics';
+            }
+            if (lyricsPanelMode === 'lyrics') {
+                const video = document.querySelector('video');
+                const player = document.getElementById('movie_player');
+                const data = player && typeof player.getVideoData === 'function' ? player.getVideoData() : {};
+                const title = cleanTrackTitle(data.title || document.title.replace(/ - YouTube(?: Music)?$/, ''));
+                const artist = cleanArtistName(data.author || '');
+                loadLyricsForCurrentTrack(title, artist, video ? video.duration : null);
+                renderLyricsLines(video?.currentTime || 0);
+            }
         }
 
         window.setStudioMode = function(active) {
@@ -3385,6 +4383,51 @@ CINEMA_JS = r"""
             }
         }
 
+        function syncStudioQueueButtons() {
+            const shuffleButtons = [document.getElementById('agSmHeroShuffleBtn'), document.getElementById('agSmShuffleBtn')];
+            shuffleButtons.forEach((button) => {
+                if (!button) return;
+                button.classList.toggle('active', studioShuffle);
+                button.setAttribute('aria-pressed', String(studioShuffle));
+                button.title = studioShuffle ? 'Shuffle is on' : 'Shuffle';
+            });
+
+            const repeatButtons = [document.getElementById('agSmHeroRepeatBtn'), document.getElementById('agSmRepeatBtn')];
+            repeatButtons.forEach((button) => {
+                if (!button) return;
+                button.classList.toggle('active', studioRepeat !== 'off');
+                button.setAttribute('aria-pressed', String(studioRepeat !== 'off'));
+                button.title = studioRepeat === 'one' ? 'Repeat one' : studioRepeat === 'all' ? 'Repeat all' : 'Repeat';
+            });
+        }
+
+        function advanceStudioQueue(direction) {
+            if (studioQueue.length === 0) {
+                const nextButton = document.querySelector('.ytp-next-button');
+                if (nextButton && direction > 0) nextButton.click();
+                return;
+            }
+
+            let nextIndex = studioQueueIndex;
+            if (studioShuffle) {
+                const choices = studioQueue.map((_, index) => index).filter((index) => index !== studioQueueIndex);
+                nextIndex = choices.length ? choices[Math.floor(Math.random() * choices.length)] : studioQueueIndex;
+            } else {
+                nextIndex += direction;
+                if (nextIndex >= studioQueue.length) {
+                    if (studioRepeat === 'all') nextIndex = 0;
+                    else return;
+                }
+                if (nextIndex < 0) nextIndex = studioQueue.length - 1;
+            }
+
+            const track = studioQueue[nextIndex];
+            if (track && track.id) {
+                studioQueueIndex = nextIndex;
+                playSongInstantly(track.id, track.url);
+            }
+        }
+
         function syncStudioPlayer() {
             try {
                 if (!isStudioActive) return;
@@ -3413,6 +4456,17 @@ CINEMA_JS = r"""
                 const sideMiniImg = document.getElementById('agSmSideMiniImg');
 
                 if (video) {
+                    if (!video._studioQueueBound) {
+                        video._studioQueueBound = true;
+                        video.addEventListener('ended', () => {
+                            if (studioRepeat === 'one') {
+                                video.currentTime = 0;
+                                video.play().catch(() => {});
+                                return;
+                            }
+                            advanceStudioQueue(1);
+                        });
+                    }
                     const isPaused = video.paused;
                     const playSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>';
                     const pauseSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
@@ -3509,6 +4563,11 @@ CINEMA_JS = r"""
                     if (sideMiniArtist) sideMiniArtist.textContent = displayAuthor;
                 }
 
+                if (lyricsPanelMode === 'lyrics') {
+                    loadLyricsForCurrentTrack(displayTitle, displayAuthor, video ? video.duration : null);
+                    renderLyricsLines(video?.currentTime || 0);
+                }
+
                 if (vId && vId !== lastVId) {
                     lastVId = vId;
                     const thumb = `https://img.youtube.com/vi/${vId}/hqdefault.jpg`;
@@ -3565,6 +4624,8 @@ CINEMA_JS = r"""
                 const renderCards = (tracks) => {
                     isFetchingRecs = false;
                     if (!tracks || tracks.length === 0) return;
+                    studioQueue = tracks.slice();
+                    studioQueueIndex = studioQueue.findIndex((track) => track.id === lastVId);
                     let cardsHtml = '';
                     tracks.forEach((t, idx) => {
                         const cleanT = cleanTrackTitle(t.title);
@@ -3705,6 +4766,8 @@ CINEMA_JS = r"""
         function playSongInstantly(songId, songUrl) {
             try {
                 safeSetStorage('ag_studio_active', '1');
+                const queuedIndex = studioQueue.findIndex((track) => track.id === songId);
+                if (queuedIndex >= 0) studioQueueIndex = queuedIndex;
                 const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
                 if (songId && player && typeof player.loadVideoById === 'function') {
                     player.loadVideoById(songId);
@@ -3793,13 +4856,8 @@ CINEMA_JS = r"""
         shuffleBtns.forEach(btn => {
             if (btn) {
                 btn.onclick = () => {
-                    const active = !btn.classList.contains('active');
-                    shuffleBtns.forEach(b => {
-                        if (b) {
-                            b.classList.toggle('active', active);
-                            b.style.color = active ? '#38bdf8' : '#cbd5e1';
-                        }
-                    });
+                    studioShuffle = !studioShuffle;
+                    syncStudioQueueButtons();
                 };
             }
         });
@@ -3808,18 +4866,23 @@ CINEMA_JS = r"""
         repeatBtns.forEach(btn => {
             if (btn) {
                 btn.onclick = () => {
-                    const video = document.querySelector('video');
-                    const active = !btn.classList.contains('active');
-                    if (video) video.loop = active;
-                    repeatBtns.forEach(b => {
-                        if (b) {
-                            b.classList.toggle('active', active);
-                            b.style.color = active ? '#38bdf8' : '#cbd5e1';
-                        }
-                    });
+                    studioRepeat = studioRepeat === 'off' ? 'all' : studioRepeat === 'all' ? 'one' : 'off';
+                    syncStudioQueueButtons();
                 };
             }
         });
+
+        syncStudioQueueButtons();
+
+        const upNextTab = document.getElementById('agSmUpNextTab');
+        const lyricsTab = document.getElementById('agSmLyricsTab');
+        if (upNextTab) upNextTab.onclick = () => showStudioPanel('up-next');
+        if (lyricsTab) lyricsTab.onclick = () => showStudioPanel('lyrics');
+        const lyricsToggle = document.getElementById('agSmLyricsBtn');
+        if (lyricsToggle) {
+            lyricsToggle.onclick = () => showStudioPanel(lyricsPanelMode === 'lyrics' ? 'up-next' : 'lyrics');
+        }
+        showStudioPanel('up-next');
 
         // Queue Button Scroll into View
         const queueBtn = document.getElementById('agSmDockQueueBtn');
@@ -3907,6 +4970,7 @@ CINEMA_JS = r"""
             smPrev.onclick = () => {
                 const video = document.querySelector('video');
                 if (video && video.currentTime > 3) video.currentTime = 0;
+                else if (studioQueue.length > 0) advanceStudioQueue(-1);
                 else window.history.back();
             };
         }
@@ -3914,8 +4978,7 @@ CINEMA_JS = r"""
         const smNext = document.getElementById('agSmNextBtn');
         if (smNext) {
             smNext.onclick = () => {
-                const nextBtn = document.querySelector('.ytp-next-button');
-                if (nextBtn) nextBtn.click();
+                advanceStudioQueue(1);
             };
         }
 
@@ -4054,14 +5117,13 @@ CINEMA_JS = r"""
         if (heroNext) heroNext.onclick = () => { if (smNext) smNext.click(); };
         const heroShuffle = document.getElementById('agSmHeroShuffleBtn');
         if (heroShuffle) heroShuffle.onclick = () => {
-            const shufBtn = document.querySelector('.ytp-shuffle-button');
-            if (shufBtn) shufBtn.click();
+            studioShuffle = !studioShuffle;
+            syncStudioQueueButtons();
         };
         const heroRepeat = document.getElementById('agSmHeroRepeatBtn');
         if (heroRepeat) heroRepeat.onclick = () => {
-            const video = document.querySelector('video');
-            if (video) video.loop = !video.loop;
-            heroRepeat.style.color = (video && video.loop) ? '#06b6d4' : '#94a3b8';
+            studioRepeat = studioRepeat === 'off' ? 'all' : studioRepeat === 'all' ? 'one' : 'off';
+            syncStudioQueueButtons();
         };
 
         // Like Buttons

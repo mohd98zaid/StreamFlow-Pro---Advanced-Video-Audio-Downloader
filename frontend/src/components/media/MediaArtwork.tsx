@@ -1,5 +1,5 @@
 import React from "react";
-import { Play, Music, Video, Film } from "lucide-react";
+import { Play, Music, Film } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 interface MediaArtworkProps {

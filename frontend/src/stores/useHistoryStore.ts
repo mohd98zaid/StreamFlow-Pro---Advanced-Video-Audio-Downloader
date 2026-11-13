@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { DownloadItem, DownloadStats } from "../types/download";
 import { api } from "../services/api";
+import { useToastStore } from "./useToastStore";
 
 interface HistoryStore {
   items: DownloadItem[];
@@ -60,22 +61,30 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
   },
 
   deleteItem: async (id: string) => {
-    await api.deleteHistoryItem(id);
-    get().fetchHistory();
-    get().fetchStats();
+    try {
+      await api.deleteHistoryItem(id);
+      await get().fetchHistory();
+      await get().fetchStats();
+    } catch (err: any) {
+      useToastStore.getState().error(err?.message || "We couldn't remove that history item", "History Error");
+    }
   },
 
   clearAll: async () => {
-    await api.clearHistory();
-    set({ items: [] });
-    get().fetchStats();
+    try {
+      await api.clearHistory();
+      set({ items: [] });
+      await get().fetchStats();
+    } catch (err: any) {
+      useToastStore.getState().error(err?.message || "We couldn't clear history", "History Error");
+    }
   },
 
   openFile: async (filePath: string) => {
     try {
       await api.openFile(filePath);
     } catch (err: any) {
-      alert(err.message || "Failed to open file");
+      useToastStore.getState().error(err.message || "Failed to open file", "File Error");
     }
   },
 
@@ -83,7 +92,7 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
     try {
       await api.openFolder(path);
     } catch (err: any) {
-      alert(err.message || "Failed to open folder");
+      useToastStore.getState().error(err.message || "Failed to open folder", "Folder Error");
     }
   },
 }));

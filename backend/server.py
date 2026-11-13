@@ -15,7 +15,7 @@ from typing import Dict, Any, List, Optional, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uvicorn
 
 # Ensure project root is in sys.path
@@ -38,10 +38,20 @@ app = FastAPI(title="StreamFlow Pro Desktop Bridge", version="1.0.0")
 # Enable CORS for local desktop UI
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # The bridge is local-only. Keep development origins explicit instead of
+    # combining wildcard origins with credentials.
+    allow_origins=[
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:47891",
+        "http://localhost:47891",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+        "tauri://localhost",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 adapter = BackendApiAdapter()
@@ -162,7 +172,7 @@ class AddDownloadRequest(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str
-    limit: int = 15
+    limit: int = Field(default=15, ge=1, le=50)
 
 
 class OpenFileRequest(BaseModel):

@@ -5,9 +5,7 @@ import {
   FolderOpen,
   Tv,
   CheckCircle2,
-  Activity,
   HardDrive,
-  RotateCcw,
   Sparkles,
 } from "lucide-react";
 import { useQueueStore } from "../../stores/useQueueStore";
@@ -16,10 +14,9 @@ import { api } from "../../services/api";
 import { MediaArtwork } from "./MediaArtwork";
 import { ProgressBar } from "../ui/ProgressBar";
 import { extractVideoId } from "../../lib/helpers";
-import { cn } from "../../lib/utils";
 
 export const MiniPlayer: React.FC = () => {
-  const { items, summary, statusMessage, pauseItem, resumeItem, retryItem } = useQueueStore();
+  const { items, statusMessage, pauseItem, resumeItem } = useQueueStore();
   const { config } = useSettingsStore();
 
   // Find the most relevant active or recent media item
@@ -67,7 +64,7 @@ export const MiniPlayer: React.FC = () => {
         <div className="flex items-center gap-4 text-foreground-subtle text-[11px]">
           <button
             onClick={() => api.openFolder(config.download_path)}
-            title="Open default download directory"
+            aria-label="Open default download directory" title="Open default download directory"
             className="flex items-center gap-1.5 hover:text-foreground transition-colors"
           >
             <HardDrive className="w-3.5 h-3.5" />
@@ -158,7 +155,7 @@ export const MiniPlayer: React.FC = () => {
         {isDownloading && (
           <button
             onClick={() => pauseItem(activeItem.id)}
-            title="Pause download"
+            aria-label="Pause download" title="Pause download"
             className="w-8 h-8 rounded-xl glass-card flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-elevated transition-colors"
           >
             <Pause className="w-3.5 h-3.5" />
@@ -168,7 +165,7 @@ export const MiniPlayer: React.FC = () => {
         {isPaused && (
           <button
             onClick={() => resumeItem(activeItem.id)}
-            title="Resume download"
+            aria-label="Resume download" title="Resume download"
             className="w-8 h-8 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary hover:bg-primary/30 transition-colors"
           >
             <Play className="w-3.5 h-3.5 fill-primary" />
@@ -179,7 +176,7 @@ export const MiniPlayer: React.FC = () => {
         {isCompleted && activeItem.file_path && (
           <button
             onClick={handleOpenFile}
-            title="Play downloaded media"
+            aria-label="Play downloaded media" title="Play downloaded media"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
           >
             <Play className="w-3 h-3 fill-white" />
@@ -190,7 +187,7 @@ export const MiniPlayer: React.FC = () => {
         {/* Stream in Ad-Free Cinema Player */}
         <button
           onClick={() => handleLaunchPlayer(activeItem.url, activeItem.title)}
-          title="Open in Yuma Studio Ad-Free Player"
+          aria-label="Open in Yuma Studio Ad-Free Player" title="Open in Yuma Studio Ad-Free Player"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl glass-card hover:bg-accent-cyan/10 hover:border-accent-cyan/40 text-foreground-muted hover:text-accent-cyan transition-colors text-xs font-medium"
         >
           <Tv className="w-3.5 h-3.5 text-accent-cyan" />
@@ -200,7 +197,7 @@ export const MiniPlayer: React.FC = () => {
         {/* Open Folder */}
         <button
           onClick={handleOpenFolder}
-          title="Reveal file in Windows Explorer"
+          aria-label="Reveal file in Windows Explorer" title="Reveal file in Windows Explorer"
           className="w-8 h-8 rounded-xl glass-card flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors"
         >
           <FolderOpen className="w-3.5 h-3.5" />
