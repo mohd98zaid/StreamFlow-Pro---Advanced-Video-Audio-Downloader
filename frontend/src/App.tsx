@@ -34,7 +34,7 @@ export function App() {
   }, [fetchQueue, loadConfig, loadPresets]);
 
   return (
-    <div className="flex min-h-dvh h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none relative app-canvas">
+    <div className="flex flex-col min-h-dvh h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none relative app-canvas">
       {/* 1. In-App Floating Toast System */}
       <ToastContainer />
 
