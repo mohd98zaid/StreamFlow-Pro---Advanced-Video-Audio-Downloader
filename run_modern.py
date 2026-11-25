@@ -76,11 +76,12 @@ def main():
 
     # 3. Launch modern desktop interface
     print("[2/2] Launching modern desktop interface...")
+    launch_url = f"{APP_URL}/?v={int(dist_index.stat().st_mtime)}"
     try:
         import webview
         window = webview.create_window(
             title="StreamFlow Pro",
-            url=APP_URL,
+            url=launch_url,
             width=1220,
             height=800,
             min_size=(960, 640),

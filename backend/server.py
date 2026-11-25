@@ -373,6 +373,14 @@ def shutdown():
 # Mount frontend production dist if available to serve desktop UI over HTTP
 dist_dir = ROOT_DIR / "frontend" / "dist"
 if dist_dir.exists():
+    @app.middleware("http")
+    async def disable_html_cache(request, call_next):
+        response = await call_next(request)
+        if request.url.path == "/" or request.url.path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
     app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="frontend")
 
 
